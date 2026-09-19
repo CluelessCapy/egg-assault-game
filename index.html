@@ -124,7 +124,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#080b12;font-family:'I
     <div>
       <div class='load-egg'></div>
       <h1 class='load-title'>EGG <span>ASSAULT</span></h1>
-      <div class='load-bar'><div class='load-fill' id='loadFill'></div></div><div class='load-tip' id='loadTip'>Frying textures&hellip;</div>
+      <div class='load-bar'><div class='load-fill' id='loadFill'></div></div>
+      <div class='load-tip' id='loadTip'>Frying textures&hellip;</div>
     </div>
   </div>
 </div>
@@ -154,11 +155,20 @@ let selectedWeaponId='ar', selectedMapId='yolkyard';
 
 /* ---------- renderer / scene ---------- */
 const canvasEl=document.getElementById('c');
-const renderer=new THREE.WebGLRenderer({canvas:canvasEl,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+/* rough heuristic: low core count or no high dpi headroom usually means an integrated/school-laptop GPU */
+let lowGraphics=(navigator.hardwareConcurrency||4)<=4;
+const renderer=new THREE.WebGLRenderer({canvas:canvasEl,antialias:!lowGraphics,powerPreference:'high-performance'});
 renderer.outputColorSpace=THREE.SRGBColorSpace;
+function applyGraphics(){
+  renderer.setPixelRatio(lowGraphics?1:Math.min(devicePixelRatio,2));
+  renderer.shadowMap.enabled=!lowGraphics;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  const mapSize=lowGraphics?1024:2048;
+  if(sun.shadow.mapSize.x!==mapSize){
+    sun.shadow.mapSize.set(mapSize,mapSize);
+    if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map=null; }
+  }
+}
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x0b1220);
@@ -178,6 +188,7 @@ sun.shadow.camera.left=-70; sun.shadow.camera.right=70;
 sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
 sun.shadow.camera.far=160;
 scene.add(sun);
+applyGraphics();
 
 /* toon shading: shared cel gradient map + outline helper for a cartoony look */
 const toonGradTex=new THREE.DataTexture(new Uint8Array([80,80,80,255, 190,190,190,255, 255,255,255,255, 255,255,255,255]),4,1,THREE.RGBAFormat);
@@ -824,8 +835,9 @@ function spawnRemotePlayer(id,data){
   mp.players[id]={
     id,g,weaponModel:w,tag,name:data.name||'Player',weaponId:data.weaponId||'ar',
     hp:data.hp!=null?data.hp:100,kills:data.kills||0,alive,
-    targetPos:new THREE.Vector3(pos[0],0,pos[2]),targetYaw:data.yaw||0,moving:false
+    targetPos:new THREE.Vector3(pos[0],0,pos[2]),targetYaw:(data.yaw||0)+Math.PI,moving:false
   };
+  g.rotation.y=mp.players[id].targetYaw;
 }
 function setRemoteWeapon(rp,weaponId){
   rp.weaponId=weaponId;
@@ -889,7 +901,7 @@ function mpHandleMessage(msg){
     const rp=mp.players[msg.id];
     if(!rp) return;
     rp.targetPos.set(msg.pos[0],0,msg.pos[2]);
-    rp.targetYaw=msg.yaw||0;
+    rp.targetYaw=(msg.yaw||0)+Math.PI;
     rp.moving=!!msg.moving;
     if(msg.weaponId&&msg.weaponId!==rp.weaponId) setRemoteWeapon(rp,msg.weaponId);
     return;
@@ -945,8 +957,8 @@ function mpHandleMessage(msg){
 const WEAPON_ACCENT={pistol:'#ffd35a',smg:'#ff6a5a',ar:'#62d391',shotgun:'#ffb066',sniper:'#7fd1ff'};
 function menuHTML(isDeath){
   const heading=isDeath
-    ?`<div class='lobby-title'>YOU GOT <span>CRACKED</span></div><div class='lobby-sub'>Wave ${player.wave} · ${player.kills} kills — try again?</div>`
-    :`<div class='lobby-title'>EGG <span>ASSAULT</span></div><div class='lobby-sub'>Fast 3D arcade FPS • survive the egg squads</div>`;
+    ?`<div class='lobby-title'>YOU GOT <span>CRACKED</span></div><div class='lobby-sub'>Wave ${player.wave} &middot; ${player.kills} kills &mdash; try again?</div>`
+    :`<div class='lobby-title'>EGG <span>ASSAULT</span></div><div class='lobby-sub'>Fast 3D arcade FPS &bull; survive the egg squads</div>`;
   const mpPanel=`<div class='mp-panel' id='mpPanel'>
       <div class='mp-row'><input class='mp-input' id='mpName' placeholder='Your name' maxlength='14' value='${mp.name||''}'></div>
       <div class='mp-row'>
@@ -972,6 +984,7 @@ function menuHTML(isDeath){
       </div>
       ${lobbyMode==='mp'?mpPanel:`<button class='btn' id='play'>${isDeath?'PLAY AGAIN':'PLAY'}</button>`}
       <div class='sensrow'>MOUSE SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
+      <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
       <div class='hint'><b>WASD</b> move &middot; <b>MOUSE</b> aim &middot; <b>CLICK</b> fire &middot; <b>R</b> reload &middot; <b>SHIFT</b> sprint &middot; <b>SPACE</b> jump &middot; right-click to scope (sniper)</div>
     </div>`;
 }
@@ -999,6 +1012,7 @@ function renderMenu(isDeath){
   buildSelectRow('weaponRow',WEAPON_DEFS,selectedWeaponId,id=>{ selectedWeaponId=id; updatePreviewWeapon(); renderMenu(isDeath); });
   buildSelectRow('mapRow',MAP_DEFS,selectedMapId,id=>{ selectedMapId=id; buildArena(selectedMapId); renderMenu(isDeath); });
   document.getElementById('sens').addEventListener('input',e=>{ sensitivity=e.target.value/10000; });
+  document.getElementById('gfxBtn').onclick=()=>{ lowGraphics=!lowGraphics; applyGraphics(); renderMenu(isDeath); };
   document.getElementById('tabSolo').onclick=()=>{ lobbyMode='solo'; renderMenu(isDeath); };
   document.getElementById('tabMp').onclick=()=>{ lobbyMode='mp'; renderMenu(isDeath); };
   if(lobbyMode==='mp'){
@@ -1201,6 +1215,7 @@ function damage(n){
   shakeMag=Math.min(1,shakeMag+n/28);
   if(!player.hp) killPlayer();
 }
+
 function killPlayer(){
   dead=true;
   document.exitPointerLock?.();
