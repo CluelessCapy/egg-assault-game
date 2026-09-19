@@ -202,6 +202,34 @@ function outline(mesh,s){
   mesh.add(o);
   return mesh;
 }
+/* batches many small static box geometries (already positioned via .translate) into one
+   BufferGeometry, so a whole cluster of crates/pillars/walls costs a single draw call
+   instead of one per block -- pure perf, pixel-identical result, no addon needed */
+function mergeBoxGeoms(list){
+  let vCount=0, iCount=0;
+  list.forEach(g=>{ vCount+=g.attributes.position.count; iCount+=g.index.count; });
+  const position=new Float32Array(vCount*3);
+  const normal=new Float32Array(vCount*3);
+  const uv=new Float32Array(vCount*2);
+  const Idx=vCount>65535?Uint32Array:Uint16Array;
+  const index=new Idx(iCount);
+  let vOff=0, iOff=0;
+  list.forEach(g=>{
+    position.set(g.attributes.position.array,vOff*3);
+    normal.set(g.attributes.normal.array,vOff*3);
+    uv.set(g.attributes.uv.array,vOff*2);
+    const src=g.index.array;
+    for(let i=0;i<src.length;i++) index[iOff+i]=src[i]+vOff;
+    iOff+=src.length;
+    vOff+=g.attributes.position.count;
+  });
+  const merged=new THREE.BufferGeometry();
+  merged.setAttribute('position',new THREE.BufferAttribute(position,3));
+  merged.setAttribute('normal',new THREE.BufferAttribute(normal,3));
+  merged.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  merged.setIndex(new THREE.BufferAttribute(index,1));
+  return merged;
+}
 
 /* ---------- procedural textures (no external assets, keeps this self-contained) ---------- */
 function canvasTexture(size,draw){
@@ -318,7 +346,10 @@ function groundHeightAt(x,z){
 
 function disposeArena(){
   arenaGroup.traverse(o=>{
-    if(o.isMesh&&o.material!==outlineMat){ o.geometry.dispose(); if(o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    if(o.isMesh){
+      o.geometry.dispose();
+      if(o.material!==outlineMat){ if(o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    }
   });
   while(arenaGroup.children.length) arenaGroup.remove(arenaGroup.children[0]);
   colliders.length=0;
@@ -344,10 +375,14 @@ function buildArena(mapId){
   sun.color.set(m.sun);
   document.getElementById('mapTag').textContent=m.tag.toUpperCase()+' • ONLINE TRAINING';
 
+  /* static blocks are collected here and batched into a few merged meshes at the end of
+     buildArena, instead of one mesh + one outline mesh per block (same look, way fewer draw calls) */
+  const wallGeoms=[], crateGeoms=[], pillarGeoms=[], outlineGeoms=[];
   function abox(x,y,z,w,h,d,mat){
-    const q=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
-    q.position.set(x,y,z); q.castShadow=q.receiveShadow=true; outline(q,1.045); arenaGroup.add(q);
-    return q;
+    const geo=new THREE.BoxGeometry(w,h,d);
+    (mat===wallMat?wallGeoms:mat===crateMat?crateGeoms:pillarGeoms).push(geo.clone().translate(x,y,z));
+    outlineGeoms.push(geo.clone().scale(1.045,1.045,1.045).translate(x,y,z));
+    geo.dispose();
   }
   function asolid(x,y,z,w,h,d,mat){ abox(x,y,z,w,h,d,mat); colliders.push({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}); }
   function addDeck(x,z,w,d,topY,mat){
@@ -376,17 +411,20 @@ function buildArena(mapId){
    [-22,1.4,-38,7,2.8,4],[26,1.4,-40,4,2.8,8],[0,1.4,-44,12,2.8,3],[-46,1.4,-2,4,2.8,10]]
    .forEach(a=>asolid(...a,crateMat));
 
-  /* inner pillar ring */
+  /* inner pillar ring -- every pillar is still there, but only every other one carries a
+     real-time light now. ~20 dynamic point lights was the single biggest GPU cost in this
+     scene (every lit fragment on screen gets shaded against every light), so thinning the
+     rings out is the highest-value perf win available without changing how the map looks */
   for(let i=0;i<8;i++){
     const a=i*Math.PI/4, px=Math.cos(a)*23, pz=Math.sin(a)*23;
     asolid(px,2.5,pz,2,5,2,pillarMat);
-    const l=new THREE.PointLight(0xffd35a,4,9); l.position.set(px,5.8,pz); arenaGroup.add(l);
+    if(i%2===0){ const l=new THREE.PointLight(0xffd35a,4,9); l.position.set(px,5.8,pz); arenaGroup.add(l); }
   }
   /* outer lamp ring, marks the far edges of the bigger map */
   for(let i=0;i<10;i++){
     const a=i*Math.PI/5+.3, px=Math.cos(a)*49, pz=Math.sin(a)*49;
     asolid(px,3,pz,1.6,6,1.6,pillarMat);
-    const l=new THREE.PointLight(m.sun,3.5,12); l.position.set(px,6.6,pz); arenaGroup.add(l);
+    if(i%2===0){ const l=new THREE.PointLight(m.sun,3.5,12); l.position.set(px,6.6,pz); arenaGroup.add(l); }
   }
 
   /* explorable raised plazas: staircases up to lookout decks, one per compass-ish direction */
@@ -404,6 +442,26 @@ function buildArena(mapId){
     abox(pz.x,pz.h+1.6,pz.z-pz.deckD/2+0.3,pz.deckW*.7,1.4,0.4,crateMat);
     const l=new THREE.PointLight(0xffd35a,5,14); l.position.set(pz.x,pz.h+3.4,pz.z); arenaGroup.add(l);
   });
+
+  /* fold every collected block into one draw call per material, plus one shared outline mesh */
+  function addMerged(geoms,mat){
+    if(!geoms.length) return;
+    const merged=mergeBoxGeoms(geoms);
+    geoms.forEach(g=>g.dispose());
+    const mesh=new THREE.Mesh(merged,mat);
+    mesh.castShadow=mesh.receiveShadow=true;
+    arenaGroup.add(mesh);
+  }
+  addMerged(wallGeoms,wallMat);
+  addMerged(crateGeoms,crateMat);
+  addMerged(pillarGeoms,pillarMat);
+  if(outlineGeoms.length){
+    const mergedOutline=mergeBoxGeoms(outlineGeoms);
+    outlineGeoms.forEach(g=>g.dispose());
+    const outMesh=new THREE.Mesh(mergedOutline,outlineMat);
+    outMesh.renderOrder=-1;
+    arenaGroup.add(outMesh);
+  }
 }
 buildArena(selectedMapId);
 
@@ -557,7 +615,7 @@ function egg(cfg){
   const g=new THREE.Group();
   const shellMat=new THREE.MeshToonMaterial({color:0xffffff,map:getShellTexture(cfg),gradientMap:toonGradTex});
 
-  const body=new THREE.Mesh(new THREE.SphereGeometry(1,28,22),shellMat);
+  const body=new THREE.Mesh(new THREE.SphereGeometry(1,18,14),shellMat);
   body.scale.set(.72*cfg.scale,.9*cfg.scale,.72*cfg.scale);
   body.position.y=1*cfg.scale;
   body.castShadow=true;
