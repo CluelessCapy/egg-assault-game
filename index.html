@@ -6,18 +6,18 @@
 <title>Egg Assault</title>
 <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;600&display=swap'>
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#080b12;font-family:'IBM Plex Sans',Arial,sans-serif;user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#bfe8ff;font-family:'IBM Plex Sans',Arial,sans-serif;user-select:none}
 #g{width:100%;height:100%;position:relative;color:white}
 #c{width:100%;height:100%;display:block}
 .hud{position:absolute;inset:0;pointer-events:none;z-index:1}
 .top{display:flex;justify-content:space-between;padding:18px;gap:10px;flex-wrap:wrap}
-.panel{background:#0b101acc;border:1px solid #ffffff22;border-radius:12px;padding:10px 14px;backdrop-filter:blur(8px);font-family:'Chakra Petch',Arial,sans-serif}
+.panel{background:#eaf6ffe6;border:3px solid #fff;border-radius:16px;padding:10px 16px;backdrop-filter:blur(8px);font-family:'Chakra Petch',Arial,sans-serif;color:#123a5e;box-shadow:0 4px 0 #9fc9e8,0 8px 14px #0003}
 .score{font-size:22px;font-weight:700}
-.wave{color:#ffd35a;font-weight:600}
+.wave{color:#ff8c1a;font-weight:700}
 .bottom{position:absolute;left:22px;right:22px;bottom:20px;display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap}
 .hp{width:min(250px,42vw);font-family:'Chakra Petch',Arial,sans-serif}
-.bar{height:14px;background:#0009;border-radius:8px;overflow:hidden}
-.fill{height:100%;background:#62d391;width:100%;transition:width .15s ease,background .2s ease}
+.bar{height:16px;background:#0009;border-radius:10px;overflow:hidden;border:2px solid #fff}
+.fill{height:100%;background:linear-gradient(#7de3a0,#4fbf78);width:100%;transition:width .15s ease,background .2s ease}
 .ammo{text-align:right;font-weight:700;font-family:'Chakra Petch',Arial,sans-serif}
 .num{font-size:clamp(30px,7vw,46px);line-height:.8;font-weight:700}
 .cross{position:absolute;left:50%;top:50%;width:20px;height:20px;transform:translate(-50%,-50%);transition:transform .08s ease}
@@ -29,30 +29,36 @@ html,body{margin:0;height:100%;overflow:hidden;background:#080b12;font-family:'I
 .hit.show{animation:hitpop .25s ease}
 @keyframes hitpop{0%{opacity:1;transform:translate(-50%,-50%) scale(1.4)}100%{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
 .damage{position:absolute;inset:0;border:7px solid #f33;opacity:0;transition:opacity .5s ease}
-.menu{position:absolute;inset:0;z-index:10;background:linear-gradient(180deg,#0007 0%,#0002 22%,#0002 60%,#000a 100%);display:none;flex-direction:column;justify-content:space-between;align-items:stretch;text-align:center;box-sizing:border-box;overflow-y:auto}
+.menu{position:absolute;inset:0;z-index:10;background:linear-gradient(180deg,#bfe8ff55 0%,#dff1ff18 25%,#dff1ff18 55%,#bfe8ffb0 100%);display:none;flex-direction:column;justify-content:space-between;align-items:stretch;text-align:center;box-sizing:border-box;overflow-y:auto}
 .menu.show{display:flex}
 .lobby-top{display:flex;justify-content:space-between;align-items:flex-start;padding:22px 26px;gap:10px}
-.lobby-title{font-family:'Chakra Petch',Arial,sans-serif;font-size:clamp(30px,6.5vw,50px);margin:0;font-weight:700;letter-spacing:-2px;color:#fff;text-shadow:0 3px 0 #0006;text-align:left}
+.lobby-title{font-family:'Chakra Petch',Arial,sans-serif;font-size:clamp(30px,6.5vw,50px);margin:0;font-weight:700;letter-spacing:-2px;color:#fff;text-shadow:-3px -3px 0 #123a5e,3px -3px 0 #123a5e,-3px 3px 0 #123a5e,3px 3px 0 #123a5e,0 7px 0 #0b263f;text-align:left}
 .lobby-title span{color:#ffd35a}
-.lobby-sub{color:#e7ecf5;margin:2px 0 0;text-align:left;font-weight:600;font-size:13px;text-shadow:0 2px 6px #0008}
-.lobby-stat{background:#0b101ac2;border:1px solid #ffffff2a;border-radius:12px;padding:8px 16px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700;color:#ffd35a;font-size:14px}
-.lobby-dock{background:linear-gradient(180deg,#0000,#0b101ae0 40%);padding:18px 20px 26px;display:flex;flex-direction:column;align-items:center;gap:12px}
-.btn{border:0;border-radius:14px;padding:16px 40px;font-weight:700;background:linear-gradient(#7de3a0,#4fbf78);color:#0c2a17;cursor:pointer;font-size:18px;font-family:'Chakra Petch',Arial,sans-serif;letter-spacing:.5px;box-shadow:0 5px 0 #2e8a52,0 8px 16px #0004;transition:transform .08s ease}
+.lobby-sub{color:#123a5e;margin:2px 0 0;text-align:left;font-weight:700;font-size:13px}
+.lobby-stat{background:#2f8fe0;border:3px solid #fff;border-radius:14px;padding:8px 16px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700;color:#fff;font-size:14px;box-shadow:0 4px 0 #1c5f9e}
+.lobby-dock{background:#dff1ffe6;border-top:4px solid #fff;border-radius:26px 26px 0 0;padding:18px 20px 26px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:0 -6px 18px #0002}
+.lobby-spotlight{flex:1;background:radial-gradient(ellipse 240px 200px at 50% 42%,#123a5e66 0%,#123a5e00 75%)}
+.btn{border:3px solid #fff;border-radius:16px;padding:16px 40px;font-weight:700;background:linear-gradient(#7de3a0,#4fbf78);color:#0c2a17;cursor:pointer;font-size:18px;font-family:'Chakra Petch',Arial,sans-serif;letter-spacing:.5px;box-shadow:0 5px 0 #2e8a52,0 8px 16px #0004;transition:transform .08s ease}
 .btn:hover{filter:brightness(1.06)}
 .btn:active{transform:translateY(3px);box-shadow:0 2px 0 #2e8a52,0 4px 10px #0004}
-.btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
-.hint{font-size:11.5px;color:#c7ceda;line-height:1.7;max-width:520px}
-.sensrow{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;color:#c7ceda;font-size:12px;font-family:'Chakra Petch',Arial,sans-serif}
+.btn:focus-visible{outline:3px solid #123a5e;outline-offset:2px}
+.btn-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn-leave{border:3px solid #fff;border-radius:16px;padding:16px 30px;font-weight:700;background:linear-gradient(#ff9a7a,#ff6a4d);color:#4a0f04;cursor:pointer;font-size:16px;font-family:'Chakra Petch',Arial,sans-serif;letter-spacing:.5px;box-shadow:0 5px 0 #b8391f,0 8px 16px #0004;transition:transform .08s ease}
+.btn-leave:hover{filter:brightness(1.06)}
+.btn-leave:active{transform:translateY(3px);box-shadow:0 2px 0 #b8391f,0 4px 10px #0004}
+.btn-leave:focus-visible{outline:3px solid #123a5e;outline-offset:2px}
+.hint{font-size:11.5px;color:#2c527a;line-height:1.7;max-width:520px;font-weight:600}
+.sensrow{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;color:#123a5e;font-size:12px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700}
 .sensrow input{width:150px}
-.select-label{font-family:'Chakra Petch',Arial,sans-serif;font-size:11px;letter-spacing:2px;color:#c7ceda;margin:0 0 6px;text-shadow:0 2px 4px #000a}
+.select-label{font-family:'Chakra Petch',Arial,sans-serif;font-size:11px;letter-spacing:2px;color:#2c527a;margin:0 0 6px;font-weight:700}
 .select-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;max-width:620px}
-.pick{border:2px solid var(--ac,#ffffff2a);background:#131a26d6;border-radius:12px;padding:8px 10px;min-width:82px;cursor:pointer;color:#dfe6f0;font-family:'Chakra Petch',Arial,sans-serif;text-align:center;transition:border-color .15s ease,background .15s ease,transform .1s ease;position:relative}
+.pick{border:3px solid var(--ac,#bcdcf0);background:#ffffffd6;border-radius:14px;padding:8px 10px;min-width:82px;cursor:pointer;color:#123a5e;font-family:'Chakra Petch',Arial,sans-serif;text-align:center;transition:border-color .15s ease,background .15s ease,transform .1s ease;position:relative;box-shadow:0 3px 0 #bcdcf0}
 .pick:hover{transform:translateY(-2px)}
-.pick.selected{background:#1c2432e8;box-shadow:0 0 0 2px var(--ac,#ffd35a) inset,0 0 14px -2px var(--ac,#ffd35a)}
-.pick-dot{width:10px;height:10px;border-radius:50%;background:var(--ac,#ffd35a);margin:0 auto 5px}
+.pick.selected{background:#fff6d8;border-color:var(--ac,#ffd35a);box-shadow:0 0 0 3px var(--ac,#ffd35a) inset,0 3px 0 #e0a92e,0 0 14px -2px var(--ac,#ffd35a)}
+.pick-dot{width:12px;height:12px;border-radius:50%;background:var(--ac,#ffd35a);margin:0 auto 5px;border:2px solid #fff;box-shadow:0 0 0 1px #123a5e33}
 .pick-name{font-weight:700;font-size:12.5px}
-.pick-tag{font-size:9px;color:#9aa5b8;margin-top:2px;letter-spacing:.2px}
-.pick-swatch{width:100%;height:28px;border-radius:7px;margin-bottom:5px;box-shadow:inset 0 0 0 1px #ffffff22}
+.pick-tag{font-size:9px;color:#5b7d9c;margin-top:2px;letter-spacing:.2px;font-weight:600}
+.pick-swatch{width:100%;height:28px;border-radius:9px;margin-bottom:5px;box-shadow:inset 0 0 0 2px #ffffffcc}
 #loading{position:absolute;inset:0;z-index:60;display:grid;place-items:center;background:linear-gradient(180deg,#bfe8ff 0%,#dcf2ff 55%,#fff3cf 100%);transition:opacity .5s ease,visibility .5s;text-align:center}
 #loading.hide{opacity:0;visibility:hidden;pointer-events:none}
 .load-egg{width:64px;height:80px;margin:0 auto 16px;border-radius:50% 50% 46% 46%/60% 60% 40% 40%;background:radial-gradient(circle at 35% 28%,#fffdf6,#ffe9b0 65%,#eec164);box-shadow:0 8px 18px #d99a3355,inset 0 -10px 14px #d99a3344;animation:eggbounce 1s ease-in-out infinite}
@@ -63,37 +69,37 @@ html,body{margin:0;height:100%;overflow:hidden;background:#080b12;font-family:'I
 .load-fill{height:100%;width:2%;background:linear-gradient(#ffe17a,#ff9a3d);transition:width .2s ease}
 .load-tip{margin-top:12px;font-family:'Chakra Petch',Arial,sans-serif;color:#6b5a3a;font-size:12.5px;font-weight:600;letter-spacing:.4px}
 .killfeed{position:absolute;top:74px;right:18px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-family:'Chakra Petch',Arial,sans-serif}
-.kf-item{background:#0b101ac2;border:1px solid #ffffff22;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;color:#ffd6d6;opacity:0;transform:translateX(24px);transition:opacity .25s ease,transform .25s ease}
+.kf-item{background:#2f8fe0e6;border:2px solid #fff;border-radius:12px;padding:6px 12px;font-size:12px;font-weight:700;color:#fff;opacity:0;transform:translateX(24px);transition:opacity .25s ease,transform .25s ease}
 .kf-item.show{opacity:1;transform:translateX(0)}
-.wavebanner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.85);font-family:'Chakra Petch',Arial,sans-serif;font-size:clamp(28px,6vw,44px);font-weight:700;letter-spacing:2px;color:#ffd35a;text-shadow:0 4px 18px #000;opacity:0;transition:opacity .35s ease,transform .35s ease}
+.wavebanner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.85);font-family:'Chakra Petch',Arial,sans-serif;font-size:clamp(28px,6vw,44px);font-weight:700;letter-spacing:2px;color:#ffd35a;text-shadow:-3px -3px 0 #123a5e,3px -3px 0 #123a5e,-3px 3px 0 #123a5e,3px 3px 0 #123a5e,0 4px 18px #000a;opacity:0;transition:opacity .35s ease,transform .35s ease}
 .wavebanner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
-.pause{position:absolute;inset:0;display:none;place-items:center;background:#00000055;pointer-events:none}
+.pause{position:absolute;inset:0;display:none;place-items:center;background:#123a5e55;pointer-events:none}
 .pause.show{display:grid}
-.pause div{background:#0b101ad9;border:1px solid #ffffff33;border-radius:12px;padding:14px 26px;font-weight:700;letter-spacing:1px;font-family:'Chakra Petch',Arial,sans-serif}
-#map{position:absolute;left:20px;bottom:76px;width:140px;height:140px;border-radius:50%;border:1px solid #ffffff2e;background:#0000;pointer-events:none}
+.pause div{background:#ffffffe8;border:3px solid #2f8fe0;border-radius:16px;padding:16px 28px;font-weight:700;letter-spacing:1px;font-family:'Chakra Petch',Arial,sans-serif;color:#123a5e}
+#map{position:absolute;left:20px;bottom:76px;width:140px;height:140px;border-radius:50%;border:3px solid #fff;background:#123a5e33;pointer-events:none}
 #scope{position:absolute;inset:0;display:none;pointer-events:none}
 #scope.show{display:block}
 #scope:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 50%, transparent 0 21%, #000 21.4% 100%)}
 #scope:after{content:'';position:absolute;left:50%;top:50%;width:1.5px;height:120%;background:#fff;opacity:.55;box-shadow:0 0 2px #000;transform:translate(-50%,-50%)}
 .scope-h{position:absolute;left:50%;top:50%;width:120%;height:1.5px;background:#fff;opacity:.55;box-shadow:0 0 2px #000;transform:translate(-50%,-50%)}
 .mp-toggle{display:flex;gap:8px;margin:2px 0 4px;width:min(360px,86vw)}
-.mp-tab{flex:1;border:2px solid #ffffff22;background:#131a26d6;border-radius:10px;padding:8px 6px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700;font-size:12px;color:#c7ceda;cursor:pointer;text-align:center}
-.mp-tab.selected{border-color:#7fd1ff;color:#fff;background:#1c2432e8;box-shadow:0 0 14px -2px #7fd1ff}
+.mp-tab{flex:1;border:3px solid #bcdcf0;background:#ffffffd6;border-radius:12px;padding:8px 6px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700;font-size:12px;color:#2c527a;cursor:pointer;text-align:center}
+.mp-tab.selected{border-color:#2f8fe0;color:#123a5e;background:#dff1ff;box-shadow:0 0 14px -2px #2f8fe0}
 .mp-panel{display:flex;flex-direction:column;gap:8px;width:min(360px,86vw);margin:0 auto}
 .mp-row{display:flex;gap:8px}
-.mp-input{flex:1;min-width:0;background:#0b101ac2;border:1px solid #ffffff2a;border-radius:8px;padding:9px 10px;color:#fff;font-family:'IBM Plex Sans',Arial,sans-serif;font-size:13px;box-sizing:border-box}
-.mp-input::placeholder{color:#7c8698}
-.mp-status{font-size:11.5px;color:#ffd35a;min-height:14px;font-family:'Chakra Petch',Arial,sans-serif}
+.mp-input{flex:1;min-width:0;background:#fff;border:3px solid #bcdcf0;border-radius:12px;padding:9px 10px;color:#123a5e;font-family:'IBM Plex Sans',Arial,sans-serif;font-size:13px;box-sizing:border-box;font-weight:600}
+.mp-input::placeholder{color:#8fa9c2}
+.mp-status{font-size:11.5px;color:#e8432f;min-height:14px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700}
 .leaderboard{position:absolute;left:20px;top:74px;display:flex;flex-direction:column;gap:4px;font-family:'Chakra Petch',Arial,sans-serif;min-width:150px}
-.lb-item{background:#0b101ac2;border:1px solid #ffffff22;border-radius:7px;padding:5px 9px;font-size:12px;color:#e7ecf5;display:flex;justify-content:space-between;gap:10px}
-.lb-item.me{border-color:#62d391;color:#62d391}
-.lb-title{font-size:10px;letter-spacing:1.5px;color:#9aa5b8;margin-bottom:2px;padding-left:2px}
-.respawn{position:absolute;inset:0;z-index:8;display:none;place-items:center;background:#000000aa;text-align:center;font-family:'Chakra Petch',Arial,sans-serif;pointer-events:none}
+.lb-item{background:#2f8fe0e6;border:2px solid #fff;border-radius:10px;padding:5px 9px;font-size:12px;color:#fff;display:flex;justify-content:space-between;gap:10px;font-weight:600}
+.lb-item.me{border-color:#ffd35a;color:#ffd35a}
+.lb-title{font-size:10px;letter-spacing:1.5px;color:#123a5e;margin-bottom:2px;padding-left:4px;font-weight:700;background:#ffffffb0;border-radius:6px;display:inline-block;padding:2px 6px}
+.respawn{position:absolute;inset:0;z-index:8;display:none;place-items:center;background:#123a5e55;text-align:center;font-family:'Chakra Petch',Arial,sans-serif;pointer-events:none}
 .respawn.show{display:grid}
-.respawn div{color:#fff}
-.respawn b{color:#ff6a5a;font-size:26px;letter-spacing:1px}
+.respawn div{background:#ffffffe8;border:4px solid #e8432f;border-radius:18px;padding:16px 30px;color:#123a5e}
+.respawn b{color:#e8432f;font-size:26px;letter-spacing:1px}
 .pause.show{pointer-events:auto;cursor:pointer}
-#leaveMp{margin-top:10px;padding:7px 16px;border:0;border-radius:8px;background:#ff6a5a;color:#2a0b08;font-weight:700;cursor:pointer;font-family:'Chakra Petch',Arial,sans-serif;font-size:12px}
+#leaveMp{margin-top:10px;padding:8px 18px;border:3px solid #fff;border-radius:12px;background:linear-gradient(#ff9a7a,#ff6a4d);color:#4a0f04;font-weight:700;cursor:pointer;font-family:'Chakra Petch',Arial,sans-serif;font-size:12px;box-shadow:0 4px 0 #b8391f}
 </style>
 </head>
 <body>
@@ -101,7 +107,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#080b12;font-family:'I
   <canvas id='c'></canvas>
   <div class='hud'>
     <div class='top'>
-      <div class='panel'><b>EGG ASSAULT</b><div style='font-size:11px;color:#aeb7c5' id='mapTag'>URBAN YOLK &bull; ONLINE TRAINING</div></div>
+      <div class='panel'><b>EGG ASSAULT</b><div style='font-size:11px;color:#4a6f92' id='mapTag'>URBAN YOLK &bull; ONLINE TRAINING</div></div>
       <div class='panel' style='text-align:right'><div class='wave' id='wave'>WAVE 1</div><div class='score' id='score'>0 KILLS</div></div>
     </div>
     <div class='cross' id='cross'></div>
@@ -119,7 +125,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#080b12;font-family:'I
     </div>
   </div>
   <div class='menu' id='menu'></div>
-  <div class='respawn' id='respawnScreen'><div><b id='respawnMsg'>CRACKED</b><div style='margin-top:8px;font-size:13px;color:#c7ceda' id='respawnSub'>Respawning&hellip;</div></div></div>
+  <div class='respawn' id='respawnScreen'><div><b id='respawnMsg'>CRACKED</b><div style='margin-top:8px;font-size:13px;color:#4a6f92' id='respawnSub'>Respawning&hellip;</div></div></div>
   <div id='loading'>
     <div>
       <div class='load-egg'></div>
@@ -140,11 +146,11 @@ const BOT_TYPES={
   brute:{hp:230,speed:.62,scale:1.5,color:0xff8a72,dmg:[9,17],label:'BRUTE EGG',gear:'helmet'}
 };
 const WEAPON_DEFS={
-  pistol:{id:'pistol',name:'Pistol',tag:'Reliable sidearm',dmg:26,pellets:1,magSize:10,reserveMax:60,fireRate:.28,auto:false,spread:.006,reloadTime:.7,reloadType:'mag',bulletSpeed:200,tracerColor:0xffe08a,tracerWidth:.010,camKick:.012,zoom:false,zoomFov:76,bodyColor:0x3d4a5c,sightColor:null,muzzleZ:-.34,viewOffset:{x:.34,y:-.28,z:-.42,scale:.9}},
-  smg:{id:'smg',name:'SMG',tag:'Fast & light',dmg:14,pellets:1,magSize:26,reserveMax:130,fireRate:.07,auto:true,spread:.02,reloadTime:.85,reloadType:'mag',bulletSpeed:180,tracerColor:0xffd35a,tracerWidth:.010,camKick:.008,zoom:false,zoomFov:76,bodyColor:0x5c2b2b,sightColor:0xff5a5a,muzzleZ:-.5,viewOffset:{x:.38,y:-.30,z:-.5,scale:.85}},
-  ar:{id:'ar',name:'AR',tag:'Balanced all-rounder',dmg:26,pellets:1,magSize:24,reserveMax:120,fireRate:.12,auto:true,spread:.01,reloadTime:.9,reloadType:'mag',bulletSpeed:220,tracerColor:0xfff1b8,tracerWidth:.012,camKick:.02,zoom:false,zoomFov:76,bodyColor:0x1c2029,sightColor:0x8cffb0,muzzleZ:-.98,viewOffset:{x:.40,y:-.30,z:-.55,scale:.85}},
-  shotgun:{id:'shotgun',name:'Shotgun',tag:'Close-range power',dmg:9,pellets:8,magSize:6,reserveMax:36,fireRate:.75,auto:false,spread:.09,reloadTime:1.1,reloadType:'pump',bulletSpeed:260,tracerColor:0xffb066,tracerWidth:.009,camKick:.05,zoom:false,zoomFov:76,bodyColor:0x2b2f37,sightColor:null,muzzleZ:-.92,viewOffset:{x:.36,y:-.32,z:-.5,scale:.85}},
-  sniper:{id:'sniper',name:'Sniper',tag:'One shot, one kill',dmg:110,pellets:1,magSize:5,reserveMax:20,fireRate:1.1,auto:false,spread:.001,reloadTime:1.3,reloadType:'bolt',bulletSpeed:400,tracerColor:0x9dffb0,tracerWidth:.014,camKick:.05,zoom:true,zoomFov:28,bodyColor:0x1f3d2b,sightColor:0x9dffb0,muzzleZ:-1.05,viewOffset:{x:.32,y:-.26,z:-.62,scale:.85}}
+  pistol:{id:'pistol',name:'Pistol',tag:'Reliable sidearm',dmg:26,pellets:1,magSize:10,reserveMax:60,fireRate:.28,auto:false,spread:.006,reloadTime:.7,reloadType:'mag',bulletSpeed:200,tracerColor:0xffe08a,tracerWidth:.010,camKick:.012,zoom:false,zoomFov:76,bodyColor:0x7a8494,accentColor:0xff8c1a,stripeColor:0xe8432f,tipColor:0xffd35a,sightColor:null,muzzleZ:-.34,viewOffset:{x:.34,y:-.28,z:-.42,scale:.9}},
+  smg:{id:'smg',name:'SMG',tag:'Fast & light',dmg:14,pellets:1,magSize:26,reserveMax:130,fireRate:.07,auto:true,spread:.02,reloadTime:.85,reloadType:'mag',bulletSpeed:180,tracerColor:0xffd35a,tracerWidth:.010,camKick:.008,zoom:false,zoomFov:76,bodyColor:0x2f7fe0,accentColor:0x7a3fd1,tipColor:0xffd35a,sightColor:0xffd35a,muzzleZ:-.5,viewOffset:{x:.38,y:-.30,z:-.5,scale:.85}},
+  ar:{id:'ar',name:'AR',tag:'Balanced all-rounder',dmg:26,pellets:1,magSize:24,reserveMax:120,fireRate:.12,auto:true,spread:.01,reloadTime:.9,reloadType:'mag',bulletSpeed:220,tracerColor:0xfff1b8,tracerWidth:.012,camKick:.02,zoom:false,zoomFov:76,bodyColor:0x1f9aa8,accentColor:0x9fe0ea,stripeColor:0xe8432f,tipColor:0xffd35a,sightColor:0xffd35a,muzzleZ:-.98,viewOffset:{x:.40,y:-.30,z:-.55,scale:.85}},
+  shotgun:{id:'shotgun',name:'Shotgun',tag:'Close-range power',dmg:9,pellets:8,magSize:6,reserveMax:36,fireRate:.75,auto:false,spread:.09,reloadTime:1.1,reloadType:'pump',bulletSpeed:260,tracerColor:0xffb066,tracerWidth:.009,camKick:.05,zoom:false,zoomFov:76,bodyColor:0x4fbf3f,accentColor:0x232830,stripeColor:0x1c1f24,tipColor:0xff8c1a,sightColor:null,muzzleZ:-.92,viewOffset:{x:.36,y:-.32,z:-.5,scale:.85}},
+  sniper:{id:'sniper',name:'Sniper',tag:'One shot, one kill',dmg:110,pellets:1,magSize:5,reserveMax:20,fireRate:1.1,auto:false,spread:.001,reloadTime:1.3,reloadType:'bolt',bulletSpeed:400,tracerColor:0x9dffb0,tracerWidth:.014,camKick:.05,zoom:true,zoomFov:28,bodyColor:0x7a8494,accentColor:0xff8c1a,scopeColor:0x4fbf3f,tipColor:0xff8c1a,sightColor:0xffe066,muzzleZ:-1.05,viewOffset:{x:.32,y:-.26,z:-.62,scale:.85}}
 };
 const MAP_DEFS={
   yolkyard:{id:'yolkyard',name:'Yolk Yard',tag:'Sunny warehouse yard',sky:['#3fa9f5','#8fd3fb','#e8f7ff'],fog:0xbfe3fb,bg:0x8fd3fb,floor:'#aeb8c2',floorLine:'rgba(30,35,45,.28)',wall:'#eecf8e',wallStripe:'#e0483f',wallDark:'#caa968',crate:'#d18f42',pillar:0xf2f5f8,ambient:[0xffffff,0x8fa6bd],sun:0xfff6df},
@@ -518,6 +524,10 @@ function weaponMats(def){
     body:MM(def.bodyColor,.75,.15),
     dark:gunMetalDark,
     metal:gunMetal,
+    accent:MM(def.accentColor!=null?def.accentColor:0x555d6a),
+    tip:MM(def.tipColor!=null?def.tipColor:0xffd35a),
+    stripe:MM(def.stripeColor!=null?def.stripeColor:0x1c1f24),
+    scope:MM(def.scopeColor!=null?def.scopeColor:0x2b2f37),
     wood:woodMat,
     lens:def.sightColor?new THREE.MeshStandardMaterial({color:0x0b1a10,emissive:def.sightColor,emissiveIntensity:1.6,roughness:.3}):null
   };
@@ -534,9 +544,11 @@ function addSight(g,mats,y,z,r){
 function buildPistol(mats){
   const g=new THREE.Group();
   localBox(g,0,0,.02,.15,.15,.32,mats.body);
-  const grip=localBox(g,0,-.17,.14,.11,.24,.10,mats.dark); grip.rotation.x=-.18;
+  localBox(g,0,.05,-.14,.15,.03,.06,mats.stripe);
+  const grip=localBox(g,0,-.17,.14,.11,.24,.10,mats.accent); grip.rotation.x=-.18;
   localBox(g,0,.005,-.20,.05,.05,.16,mats.metal);
-  const magazine=localBox(g,0,-.30,.13,.075,.14,.08,mats.metal);
+  localBox(g,0,.005,-.29,.055,.055,.035,mats.tip);
+  const magazine=localBox(g,0,-.30,.13,.075,.14,.08,mats.accent);
   localBox(g,0,.075,-.05,.03,.025,.10,mats.dark);
   return {group:g,magazine};
 }
@@ -545,8 +557,9 @@ function buildSMG(mats){
   localBox(g,0,0,0,.17,.18,.46,mats.body);
   const stock=localBox(g,0,0,.34,.09,.12,.20,mats.dark); stock.rotation.x=.05;
   localBox(g,0,.01,-.34,.06,.06,.24,mats.metal);
-  const grip=localBox(g,0,-.20,.08,.12,.28,.13,mats.body); grip.rotation.x=-.3;
-  const magazine=localBox(g,0,-.30,-.06,.09,.30,.12,mats.metal); magazine.rotation.x=.18;
+  localBox(g,0,.01,-.47,.065,.065,.035,mats.tip);
+  const grip=localBox(g,0,-.20,.08,.12,.28,.13,mats.accent); grip.rotation.x=-.3;
+  const magazine=localBox(g,0,-.30,-.06,.09,.30,.12,mats.accent); magazine.rotation.x=.18;
   const bolt=localBox(g,.12,.07,.05,.045,.045,.09,mats.dark);
   addSight(g,mats,.155,-.04,.038);
   return {group:g,magazine,bolt};
@@ -554,10 +567,11 @@ function buildSMG(mats){
 function buildAR(mats){
   const g=new THREE.Group();
   localBox(g,0,.02,.05,.30,.20,.66,mats.body);
+  localBox(g,0,.13,.05,.30,.025,.08,mats.stripe);
   const stock=localBox(g,0,-.01,.46,.15,.16,.28,mats.dark); stock.rotation.x=.10;
   localBox(g,0,.015,-.56,.075,.075,.56,mats.metal);
-  localBox(g,0,.015,-.87,.115,.115,.11,mats.dark);
-  localBox(g,0,-.015,-.26,.21,.15,.36,mats.dark);
+  localBox(g,0,.015,-.87,.115,.115,.11,mats.tip);
+  localBox(g,0,-.015,-.26,.21,.15,.36,mats.accent);
   const grip=localBox(g,0,-.22,.16,.13,.32,.15,mats.body); grip.rotation.x=-.32;
   const magazine=localBox(g,0,-.30,-.03,.10,.32,.15,mats.dark); magazine.rotation.x=.1;
   const bolt=localBox(g,.16,.075,.10,.05,.05,.11,mats.dark);
@@ -569,9 +583,13 @@ function buildAR(mats){
 function buildShotgun(mats){
   const g=new THREE.Group();
   localBox(g,0,0,.05,.17,.19,.5,mats.body);
-  const stock=localBox(g,0,-.02,.5,.13,.15,.26,mats.wood); stock.rotation.x=.12;
+  localBox(g,0,.10,.14,.19,.02,.04,mats.stripe);
+  localBox(g,0,.10,-.02,.19,.02,.04,mats.stripe);
+  localBox(g,0,.10,-.18,.19,.02,.04,mats.stripe);
+  const stock=localBox(g,0,-.02,.5,.13,.15,.26,mats.dark); stock.rotation.x=.12;
   localBox(g,0,-.02,-.55,.085,.085,.62,mats.metal);
-  const pump=localBox(g,0,-.10,-.30,.13,.11,.22,mats.wood);
+  localBox(g,0,-.02,-.87,.09,.09,.06,mats.tip);
+  const pump=localBox(g,0,-.10,-.30,.13,.11,.22,mats.accent);
   const bead=new THREE.Mesh(new THREE.SphereGeometry(.02,6,6),mats.metal); bead.position.set(0,.075,-.85); g.add(bead);
   const grip=localBox(g,0,-.22,.20,.12,.28,.14,mats.dark); grip.rotation.x=-.3;
   return {group:g,pump};
@@ -581,16 +599,17 @@ function buildSniper(mats){
   localBox(g,0,0,.15,.14,.14,.66,mats.body);
   const stock=localBox(g,0,-.02,.62,.11,.14,.30,mats.dark); stock.rotation.x=.1;
   localBox(g,0,.01,-.55,.045,.045,.85,mats.metal);
+  localBox(g,0,.01,-.97,.05,.05,.045,mats.tip);
   const bolt=localBox(g,.12,.07,.20,.045,.045,.13,mats.dark);
   const grip=localBox(g,0,-.20,.30,.11,.26,.13,mats.dark); grip.rotation.x=-.3;
-  const scopeBody=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.34,10),mats.dark);
+  const scopeBody=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.34,10),mats.scope);
   scopeBody.rotation.z=Math.PI/2; scopeBody.position.set(0,.15,-.05); g.add(scopeBody);
   if(mats.lens){
     const lensFront=new THREE.Mesh(new THREE.CircleGeometry(.045,12),mats.lens);
     lensFront.position.set(0,.15,-.22); g.add(lensFront);
   }
-  localBox(g,0,.10,.05,.03,.05,.03,mats.dark);
-  localBox(g,0,.10,-.15,.03,.05,.03,mats.dark);
+  localBox(g,0,.10,.05,.03,.05,.03,mats.accent);
+  localBox(g,0,.10,-.15,.03,.05,.03,mats.accent);
   return {group:g,bolt};
 }
 function buildGunModel(def){
@@ -1037,7 +1056,7 @@ function mpHandleMessage(msg){
 }
 
 /* ---------- lobby menu (weapon + map loadout) ---------- */
-const WEAPON_ACCENT={pistol:'#ffd35a',smg:'#ff6a5a',ar:'#62d391',shotgun:'#ffb066',sniper:'#7fd1ff'};
+const WEAPON_ACCENT={pistol:'#ff8c4d',smg:'#8a5cff',ar:'#29c5c5',shotgun:'#4fd15c',sniper:'#ffcf40'};
 function menuHTML(isDeath){
   const heading=isDeath
     ?`<div class='lobby-title'>YOU GOT <span>CRACKED</span></div><div class='lobby-sub'>Wave ${player.wave} &middot; ${player.kills} kills &mdash; try again?</div>`
@@ -1054,7 +1073,8 @@ function menuHTML(isDeath){
   return `<div class='lobby-top'>
       <div>${heading}</div>
       <div class='lobby-stat'>BEST&nbsp;WAVE&nbsp;${Math.max(player.wave,1)}</div>
-    </div>    <div></div>
+    </div>
+    <div class='lobby-spotlight'></div>
     <div class='lobby-dock'>
       <div class='select-label'>WEAPON</div>
       <div class='select-row' id='weaponRow'></div>
@@ -1064,7 +1084,8 @@ function menuHTML(isDeath){
         <button type='button' class='mp-tab${lobbyMode==='solo'?' selected':''}' id='tabSolo'>SURVIVAL</button>
         <button type='button' class='mp-tab${lobbyMode==='mp'?' selected':''}' id='tabMp'>MULTIPLAYER</button>
       </div>
-      ${lobbyMode==='mp'?mpPanel:`<button class='btn' id='play'>${isDeath?'PLAY AGAIN':'PLAY'}</button>`}
+      ${lobbyMode==='mp'?mpPanel:`<div class='btn-row'><button class='btn' id='play'>${isDeath?'PLAY AGAIN':'PLAY'}</button></div>`}
+      ${isDeath?`<button class='btn-leave' id='leaveBtn' type='button'>LEAVE</button>`:''}
       <div class='sensrow'>MOUSE SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
       <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
       <div class='hint'><b>WASD</b> move &middot; <b>MOUSE</b> aim &middot; <b>CLICK</b> fire &middot; <b>R</b> reload &middot; <b>SHIFT</b> sprint &middot; <b>SPACE</b> jump &middot; right-click to scope (sniper)</div>
@@ -1111,6 +1132,15 @@ function renderMenu(isDeath){
     };
   } else {
     document.getElementById('play').onclick=()=>{ audioInit(); if(mp.connected||mp.connecting) mpDisconnect(); startGame(false); };
+  }
+  if(isDeath){
+    const leaveBtn=document.getElementById('leaveBtn');
+    if(leaveBtn) leaveBtn.onclick=()=>{
+      if(mp.connected||mp.connecting) mpDisconnect();
+      lobbyMode='solo';
+      player.wave=1; player.kills=0;
+      renderMenu(false);
+    };
   }
 }
 
@@ -1501,8 +1531,7 @@ function update(dt){
     if(keys.w) wish.add(fwd);
     if(keys.s) wish.sub(fwd);
     if(keys.d) wish.add(right);
-    if(keys.a) wish.sub(right);
-    moving=wish.lengthSq()>0.0001;
+    if(keys.a) wish.sub(right);    moving=wish.lengthSq()>0.0001;
     let targetX=0,targetZ=0;
     if(moving){ wish.normalize().multiplyScalar(sp); targetX=wish.x; targetZ=wish.z; }
     const accel=Math.min(1,14*dt);
