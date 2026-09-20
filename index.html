@@ -136,11 +136,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:#bfe8ff;font-family:'I
     </div>
   </div>
 </div>
+<script src="map-shapes.js"></script>
 <script type='module'>
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js';
 
 /* ---------- constants ---------- */
-const EYE_HEIGHT=1.65, ARENA_LIMIT=54, PLAYER_RADIUS=0.45, GRAVITY=18, JUMP_SPEED=7.2;
+const EYE_HEIGHT=1.65, PLAYER_RADIUS=0.45, GRAVITY=18, JUMP_SPEED=7.2;
+/* the built-in maps always use 54; a community map with its own mapSize preset
+   (see buildArena) overrides this so its boundary matches its actual walls. */
+let ARENA_LIMIT=54;
 const BOT_TYPES={
   yolk:{hp:100,speed:1.05,scale:1,color:0xf3e5c5,dmg:[4,9],label:'EGG',gear:null},
   scout:{hp:55,speed:1.75,scale:.72,color:0x8fd1ff,dmg:[3,6],label:'SCOUT EGG',gear:'goggles'},
@@ -401,6 +405,7 @@ function registerCommunityMap(sub){
     ambient:[hexToNum(ambientIn[0],0xffffff),hexToNum(ambientIn[1],0x93a8bd)],
     sun:hexToNum(c.sun,0xfff3d6),
     customObjects:Array.isArray(sub.objects)?sub.objects:[],
+    mapSize:(sub.mapSize==='small'||sub.mapSize==='large')?sub.mapSize:'medium',
     community:true
   };
 }
@@ -513,10 +518,54 @@ function buildArena(mapId){
     const odd=(((steps%2)+2)%2)===1;
     return odd?{w:o.d,d:o.w}:{w:o.w,d:o.d};
   }
+  /* new piece types (halfwall/stairs/arch/barrel/sphere/cone) plus the per-piece "glow" flag,
+     added for player-built maps. The existing wall/crate/pillar/platform/ramp path above is left
+     exactly as it was so already-approved community maps keep rendering identically. */
+  const GLOW_COLOR_KEY={wall:'wall',halfwall:'wall',arch:'wall',crate:'crate',ramp:'crate',
+    stairs:'crate',barrel:'crate',cone:'crate',pillar:'pillar',sphere:'pillar',platform:'pillar'};
+  function glowColorFor(o){
+    const key=GLOW_COLOR_KEY[o.type]||'crate';
+    return key==='pillar'?m.pillar:m[key];
+  }
+  function addGlowLight(o){
+    const reach=Math.max(o.w||2,o.d||2,o.h||2)*3.2+5;
+    const l=new THREE.PointLight(EggMapShapes.hexNum(glowColorFor(o)),2.4,reach);
+    l.position.set(o.x,(o.h||2)*0.55,o.z);
+    arenaGroup.add(l);
+  }
+  function addCustomStairs(o,mat){
+    const steps=EggMapShapes.stairsSteps(o);
+    const stepH=o.h/steps.length;
+    steps.forEach(r=>{
+      const cx=(r.minX+r.maxX)/2, cz=(r.minZ+r.maxZ)/2, w=r.maxX-r.minX, d=r.maxZ-r.minZ;
+      abox(cx,r.top-stepH/2,cz,w,stepH,d,mat);
+      platforms.push({minX:r.minX,maxX:r.maxX,minZ:r.minZ,maxZ:r.maxZ,kind:'flat',top:r.top});
+    });
+  }
+  function addCustomArch(o,mat){
+    const parts=EggMapShapes.archParts(o);
+    asolid((parts.postA.minX+parts.postA.maxX)/2,o.h/2,(parts.postA.minZ+parts.postA.maxZ)/2,
+      parts.postA.maxX-parts.postA.minX,o.h,parts.postA.maxZ-parts.postA.minZ,mat);
+    asolid((parts.postB.minX+parts.postB.maxX)/2,o.h/2,(parts.postB.minZ+parts.postB.maxZ)/2,
+      parts.postB.maxX-parts.postB.minX,o.h,parts.postB.maxZ-parts.postB.minZ,mat);
+    /* the lintel is drawn but deliberately left out of `colliders` -- this game's collision is
+       flat/top-down (see resolveCollisions), so a floating overhead box there would wrongly
+       block the walk-through gap underneath it instead of just sitting above it. */
+    const lw=parts.lintel.maxX-parts.lintel.minX, ld=parts.lintel.maxZ-parts.lintel.minZ, lh=parts.lintel.top-parts.lintel.bottom;
+    abox((parts.lintel.minX+parts.lintel.maxX)/2,parts.lintel.bottom+lh/2,(parts.lintel.minZ+parts.lintel.maxZ)/2,lw,lh,ld,mat);
+  }
+  function addCustomRadial(o,shapeType){
+    const mesh=EggMapShapes.buildShapeVisual(THREE,Object.assign({},o,{glow:false}),shapeType==='sphere'?m.pillar:m.crate);
+    arenaGroup.add(mesh);
+    const r=o.w/2;
+    colliders.push({minX:o.x-r,maxX:o.x+r,minZ:o.z-r,maxZ:o.z+r});
+  }
   function buildCustomLayout(objects){
     objects.forEach(o=>{
       const wd=orientWD(o);
       if(o.type==='wall'){
+        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
+      } else if(o.type==='halfwall'){
         asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
       } else if(o.type==='crate'){
         asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,crateMat);
@@ -527,15 +576,32 @@ function buildArena(mapId){
         addDeck(o.x,o.z,wd.w,wd.d,o.h,pillarMat);
       } else if(o.type==='ramp'){
         addRamp(o.x,o.z,o.w,o.d,o.h,o.rot||0,crateMat);
+      } else if(o.type==='stairs'){
+        addCustomStairs(o,crateMat);
+      } else if(o.type==='arch'){
+        addCustomArch(o,wallMat);
+      } else if(o.type==='barrel'||o.type==='sphere'||o.type==='cone'){
+        addCustomRadial(o,o.type);
       }
+      if(o.glow) addGlowLight(o);
     });
   }
 
-  const groundMesh=new THREE.Mesh(new THREE.PlaneGeometry(130,130),groundMat);
+  /* half/full default to exactly the numbers the 3 built-in maps always used (58/116), so this
+     branch is a no-op for them. Only a community map carries m.mapSize, and only then does the
+     ground/boundary/out-of-bounds limit actually change size. */
+  let half=58, full=116;
+  if(m.mapSize){
+    const sz=EggMapShapes.mapSizeById(m.mapSize);
+    half=sz.half; full=half*2;
+  }
+  ARENA_LIMIT=m.mapSize?Math.max(6,half-4):54;
+
+  const groundMesh=new THREE.Mesh(new THREE.PlaneGeometry(full+14,full+14),groundMat);
   groundMesh.rotation.x=-Math.PI/2; groundMesh.receiveShadow=true; arenaGroup.add(groundMesh);
 
-  abox(0,3,-58,118,6,1,wallMat); abox(0,3,58,118,6,1,wallMat);
-  abox(-58,3,0,1,6,116,wallMat); abox(58,3,0,1,6,116,wallMat);
+  abox(0,3,-half,full+2,6,1,wallMat); abox(0,3,half,full+2,6,1,wallMat);
+  abox(-half,3,0,1,6,full,wallMat); abox(half,3,0,1,6,full,wallMat);
 
   if(m.customObjects){
     /* a player-built map from the Map Studio: everything on it came from that data-driven
