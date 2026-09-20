@@ -616,7 +616,7 @@ function startApp(){
         crate: t.crate, pillar: t.pillar, ambient: t.ambient, sun: t.sun
       },
       objects: state.objects.map(function(o){
-        return {type:o.type, x:round1(o.x), z:round1(o.z), w:round1(o.w), d:round1(o.d), h:round1(o.h), rot:o.rot||0, glow: !!o.glow};
+        return {type:o.type, x:round1(o.x), z:round1(o.z), w:round1(o.w), d:round1(o.d), h:round1(o.h), rot:o.rot||0, glow: !!o.glow, color: o.color || null};
       })
     };
   }
@@ -765,10 +765,13 @@ function startApp(){
   };
   function meshForObj(o, theme){
     var colorKey = TYPE_COLOR_KEY[o.type] || 'crate';
-    var mesh = EggMapShapes.buildShapeVisual(THREE, o, theme[colorKey]);
+    var mesh = EggMapShapes.buildShapeVisual(THREE, o, o.color || theme[colorKey]);
     mesh.userData.id = o.id;
     mesh.castShadow=false;
     return mesh;
+  }
+  function defaultColorFor(o, theme){
+    return (theme[TYPE_COLOR_KEY[o.type] || 'crate'] || '#d69248');
   }
 
   /* ---- resize handles: small draggable markers around the selected piece ---- */
@@ -915,6 +918,20 @@ function startApp(){
     panel.appendChild(glowWrap);
     document.getElementById('glowChk').addEventListener('change', function(e){
       o.glow = !!e.target.checked; rebuildObjects(); selectObj(o.id); persist();
+    });
+
+    var curColor = o.color || defaultColorFor(o, themeById(state.theme));
+    var colorWrap = document.createElement('div');
+    colorWrap.className = 'glow-toggle';
+    colorWrap.innerHTML = '<b>Colour</b><span style="display:flex;align-items:center;gap:8px">'+
+      '<input type="color" id="colorPick" value="'+curColor+'" style="width:34px;height:26px;border:none;background:none;cursor:pointer;padding:0">'+
+      '<button type="button" class="btn btn-ghost" id="colorReset" style="padding:4px 9px;font-size:12px">Reset</button></span>';
+    panel.appendChild(colorWrap);
+    document.getElementById('colorPick').addEventListener('input', function(e){
+      o.color = e.target.value; rebuildObjects(); selectObj(o.id); persist();
+    });
+    document.getElementById('colorReset').addEventListener('click', function(){
+      delete o.color; rebuildObjects(); selectObj(o.id); persist();
     });
 
     var btnRow = document.createElement('div');
