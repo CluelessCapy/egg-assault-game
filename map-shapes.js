@@ -31,18 +31,22 @@
   // ---- piece catalog ------------------------------------------------------
   // `radial` pieces (barrel/sphere/cone) use w as a diameter and don't get an
   // independent depth control. `uniform` (sphere) also locks height to w.
+  // Upper bounds here are deliberately generous (well past any built-in map's size) rather
+  // than a "real" limit -- players asked to be able to make pieces any size they like, and an
+  // HTML range input needs *some* max to stay usable, so this is effectively unlimited in
+  // practice while still keeping the slider draggable.
   var SHAPE_DEFS = [
-    { type: "wall", label: "Wall", w: 6, d: 1, h: 4, ranges: { w: [2, 30, 0.5], d: [0.5, 4, 0.5], h: [2, 8, 0.5] } },
-    { type: "halfwall", label: "Low Wall", w: 6, d: 1, h: 1.6, ranges: { w: [2, 30, 0.5], d: [0.5, 4, 0.5], h: [1, 2.6, 0.2] } },
-    { type: "crate", label: "Crate", w: 2, d: 2, h: 2, ranges: { w: [1, 8, 0.5], d: [1, 8, 0.5], h: [1, 8, 0.5] } },
-    { type: "pillar", label: "Pillar", w: 1.6, d: 1.6, h: 5, ranges: { w: [1, 3, 0.2], d: [1, 3, 0.2], h: [2, 9, 0.5] } },
-    { type: "platform", label: "Platform", w: 8, d: 8, h: 2.6, ranges: { w: [3, 20, 0.5], d: [3, 20, 0.5], h: [1, 7, 0.5] } },
-    { type: "ramp", label: "Ramp", w: 2.6, d: 4, h: 2.6, ranges: { w: [1.5, 8, 0.5], d: [2, 14, 0.5], h: [1, 7, 0.5] } },
-    { type: "stairs", label: "Stairs", w: 2.4, d: 6, h: 3, ranges: { w: [1.6, 6, 0.2], d: [2, 16, 0.5], h: [1, 8, 0.5] } },
-    { type: "arch", label: "Archway", w: 6, d: 1.2, h: 4.5, ranges: { w: [4, 16, 0.5], d: [0.8, 3, 0.2], h: [3, 8, 0.5] } },
-    { type: "barrel", label: "Barrel", w: 1.8, d: 1.8, h: 2.2, radial: true, ranges: { w: [0.8, 4, 0.2], h: [1, 5, 0.5] } },
-    { type: "sphere", label: "Sphere", w: 1.6, d: 1.6, h: 1.6, radial: true, uniform: true, ranges: { w: [0.6, 4, 0.2] } },
-    { type: "cone", label: "Cone", w: 1.6, d: 1.6, h: 2.2, radial: true, ranges: { w: [0.6, 4, 0.2], h: [1, 5, 0.5] } }
+    { type: "wall", label: "Wall", w: 6, d: 1, h: 4, ranges: { w: [2, 300, 0.5], d: [0.5, 300, 0.5], h: [2, 300, 0.5] } },
+    { type: "halfwall", label: "Low Wall", w: 6, d: 1, h: 1.6, ranges: { w: [2, 300, 0.5], d: [0.5, 300, 0.5], h: [1, 300, 0.2] } },
+    { type: "crate", label: "Crate", w: 2, d: 2, h: 2, ranges: { w: [1, 300, 0.5], d: [1, 300, 0.5], h: [1, 300, 0.5] } },
+    { type: "pillar", label: "Pillar", w: 1.6, d: 1.6, h: 5, ranges: { w: [1, 300, 0.2], d: [1, 300, 0.2], h: [2, 300, 0.5] } },
+    { type: "platform", label: "Platform", w: 8, d: 8, h: 2.6, ranges: { w: [3, 300, 0.5], d: [3, 300, 0.5], h: [1, 300, 0.5] } },
+    { type: "ramp", label: "Ramp", w: 2.6, d: 4, h: 2.6, ranges: { w: [1.5, 300, 0.5], d: [2, 300, 0.5], h: [1, 300, 0.5] } },
+    { type: "stairs", label: "Stairs", w: 2.4, d: 6, h: 3, ranges: { w: [1.6, 300, 0.2], d: [2, 300, 0.5], h: [1, 300, 0.5] } },
+    { type: "arch", label: "Archway", w: 6, d: 1.2, h: 4.5, ranges: { w: [4, 300, 0.5], d: [0.8, 300, 0.2], h: [3, 300, 0.5] } },
+    { type: "barrel", label: "Barrel", w: 1.8, d: 1.8, h: 2.2, radial: true, ranges: { w: [0.8, 300, 0.2], h: [1, 300, 0.5] } },
+    { type: "sphere", label: "Sphere", w: 1.6, d: 1.6, h: 1.6, radial: true, uniform: true, ranges: { w: [0.6, 300, 0.2] } },
+    { type: "cone", label: "Cone", w: 1.6, d: 1.6, h: 2.2, radial: true, ranges: { w: [0.6, 300, 0.2], h: [1, 300, 0.5] } }
   ];
   function shapeDef(type) {
     for (var i = 0; i < SHAPE_DEFS.length; i++) if (SHAPE_DEFS[i].type === type) return SHAPE_DEFS[i];
