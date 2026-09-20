@@ -37,6 +37,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#bfe8ff;font-family:'I
 .lobby-title span{color:#ffd35a}
 .lobby-sub{color:#123a5e;margin:2px 0 0;text-align:left;font-weight:700;font-size:13px;text-shadow:0 1px 0 #ffffffa0}
 .lobby-stat{background:#2f8fe0;border:3px solid #fff;border-radius:14px;padding:8px 16px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700;color:#fff;font-size:14px;box-shadow:0 4px 0 #1c5f9e}
+.lobby-top-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.build-map-link{background:#ffd35a;border:3px solid #fff;border-radius:14px;padding:7px 14px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700;color:#5a3a06;font-size:12.5px;box-shadow:0 4px 0 #c9982c;text-decoration:none;white-space:nowrap}
+.build-map-link:hover{filter:brightness(1.05)}
+.community-tag{position:absolute;top:6px;right:6px;background:#4fbf78;color:#fff;font:700 9px 'Chakra Petch',Arial,sans-serif;padding:2px 6px;border-radius:8px;letter-spacing:.03em}
 .lobby-dock{background:#dff1ffe6;border-top:4px solid #fff;border-radius:26px 26px 0 0;padding:13px 20px 18px;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 -6px 18px #0003;max-height:50vh;overflow-y:auto}
 .lobby-spotlight{flex:1;min-height:6px;pointer-events:none}
 .btn{border:3px solid #fff;border-radius:16px;padding:16px 40px;font-weight:700;background:linear-gradient(#7de3a0,#4fbf78);color:#0c2a17;cursor:pointer;font-size:18px;font-family:'Chakra Petch',Arial,sans-serif;letter-spacing:.5px;box-shadow:0 5px 0 #2e8a52,0 8px 16px #0004;transition:transform .08s ease}
@@ -353,10 +357,70 @@ function groundHeightAt(x,z){
   let h=0;
   for(const p of platforms){
     if(x<p.minX||x>p.maxX||z<p.minZ||z>p.maxZ) continue;
-    if(p.top>h) h=p.top;
+    let top;
+    if(p.kind==='ramp'){
+      const coord=p.axis==='z'?z:x;
+      let t=(coord-p.lowCoord)/(p.highCoord-p.lowCoord);
+      t=Math.max(0,Math.min(1,t));
+      top=p.h*t;
+    } else {
+      top=p.top;
+    }
+    if(top>h) h=top;
   }
   return h;
 }
+
+/* ---------- community maps (built in the Map Studio, approved by the site owner) ----------
+   Approved submissions come back from the server shaped like {id,name,tag,submitter,colors,
+   objects}. We fold each one into MAP_DEFS using the same field names the built-in maps use, so
+   the existing map-picker UI and buildArena() need only a small amount of new branching to
+   support them (see customObjects below). Colors on the wire are all hex strings; MAP_DEFS
+   expects numbers for a few fields (fog/bg/pillar/ambient/sun), so those get converted here. */
+const MAP_SERVER_HTTP='https://egg-assault-server.onrender.com';
+let lastMenuIsDeath=false;
+function hexToNum(s,fallback){
+  const n=parseInt(String(s||'').replace('#',''),16);
+  return Number.isFinite(n)?n:fallback;
+}
+function registerCommunityMap(sub){
+  if(!sub||!sub.id||MAP_DEFS[sub.id]) return;
+  const c=sub.colors||{};
+  const sky=Array.isArray(c.sky)&&c.sky.length===3?c.sky:['#4fb2f2','#9ad8fb','#eef9ff'];
+  const ambientIn=Array.isArray(c.ambient)&&c.ambient.length===2?c.ambient:['#ffffff','#93a8bd'];
+  MAP_DEFS[sub.id]={
+    id:sub.id,
+    name:String(sub.name||'Player Map').slice(0,24),
+    tag:String(sub.tag||'A custom arena').slice(0,60),
+    sky,
+    fog:hexToNum(c.fog,0xbfe3fb), bg:hexToNum(c.bg,0x8fd3fb),
+    floor:c.floor||'#b7c0c9', floorLine:c.floorLine||'rgba(30,35,45,.28)',
+    wall:c.wall||'#f0d59a', wallStripe:c.wallStripe||'#e5543f', wallDark:c.wallDark||'#cdab6c',
+    crate:c.crate||'#d69248',
+    pillar:hexToNum(c.pillar,0xf4f7fa),
+    ambient:[hexToNum(ambientIn[0],0xffffff),hexToNum(ambientIn[1],0x93a8bd)],
+    sun:hexToNum(c.sun,0xfff3d6),
+    customObjects:Array.isArray(sub.objects)?sub.objects:[],
+    community:true
+  };
+}
+function refreshMapRowIfShown(){
+  if(document.getElementById('mapRow')){
+    buildSelectRow('mapRow',MAP_DEFS,selectedMapId,id=>{ selectedMapId=id; buildArena(selectedMapId); renderMenu(lastMenuIsDeath); });
+  }
+}
+function loadCommunityMaps(){
+  const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),8000));
+  Promise.race([fetch(MAP_SERVER_HTTP+'/api/approved'),timeout])
+    .then(r=>r.json())
+    .then(list=>{
+      if(!Array.isArray(list)) return;
+      list.forEach(registerCommunityMap);
+      refreshMapRowIfShown();
+    })
+    .catch(()=>{ /* server may be cold-starting or unreachable — the built-in maps still work fine */ });
+}
+loadCommunityMaps();
 
 function disposeArena(){
   arenaGroup.traverse(o=>{
@@ -419,6 +483,53 @@ function buildArena(mapId){
       platforms.push({minX:sx-stepW/2,maxX:sx+stepW/2,minZ:sz-stepD/2,maxZ:sz+stepD/2,kind:'flat',top});
     }
   }
+  /* a rotated wedge mesh (not axis-aligned, so it can't go through the abox/merge pipeline
+     above) plus the matching sloped "floor" so players can actually walk up it. rot is always
+     a multiple of 90 in practice (the Map Studio only rotates pieces in 90-degree steps), which
+     keeps the geometry below to four simple cardinal cases instead of arbitrary angles. */
+  function addRamp(x,z,w,d,h,rotDeg,mat){
+    const len=Math.sqrt(d*d+h*h);
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,0.3,len),mat);
+    mesh.position.set(x,h/2,z);
+    mesh.rotation.x=-Math.atan2(h,d);
+    mesh.rotation.y=(rotDeg||0)*Math.PI/180;
+    mesh.castShadow=true; mesh.receiveShadow=true;
+    outline(mesh,1.05);
+    arenaGroup.add(mesh);
+
+    const steps=(Math.round((rotDeg||0)/90)%4+4)%4;
+    let rect,axis,lowCoord,highCoord;
+    if(steps===0){ rect={minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}; axis='z'; lowCoord=z-d/2; highCoord=z+d/2; }
+    else if(steps===2){ rect={minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}; axis='z'; lowCoord=z+d/2; highCoord=z-d/2; }
+    else if(steps===1){ rect={minX:x-d/2,maxX:x+d/2,minZ:z-w/2,maxZ:z+w/2}; axis='x'; lowCoord=x-d/2; highCoord=x+d/2; }
+    else { rect={minX:x-d/2,maxX:x+d/2,minZ:z-w/2,maxZ:z+w/2}; axis='x'; lowCoord=x+d/2; highCoord=x-d/2; }
+    platforms.push(Object.assign({kind:'ramp',axis,lowCoord,highCoord,h},rect));
+  }
+  /* a wall/crate/pillar/platform piece rotated 90 or 270 degrees swaps its footprint's width
+     and depth for our axis-aligned box pipeline -- close enough to true rotation for the
+     mostly-rectangular pieces the Studio offers, and exact for anything built from squares. */
+  function orientWD(o){
+    const steps=Math.round((o.rot||0)/90);
+    const odd=(((steps%2)+2)%2)===1;
+    return odd?{w:o.d,d:o.w}:{w:o.w,d:o.d};
+  }
+  function buildCustomLayout(objects){
+    objects.forEach(o=>{
+      const wd=orientWD(o);
+      if(o.type==='wall'){
+        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
+      } else if(o.type==='crate'){
+        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,crateMat);
+      } else if(o.type==='pillar'){
+        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,pillarMat);
+        const l=new THREE.PointLight(0xffd35a,3.5,10); l.position.set(o.x,o.h+0.4,o.z); arenaGroup.add(l);
+      } else if(o.type==='platform'){
+        addDeck(o.x,o.z,wd.w,wd.d,o.h,pillarMat);
+      } else if(o.type==='ramp'){
+        addRamp(o.x,o.z,o.w,o.d,o.h,o.rot||0,crateMat);
+      }
+    });
+  }
 
   const groundMesh=new THREE.Mesh(new THREE.PlaneGeometry(130,130),groundMat);
   groundMesh.rotation.x=-Math.PI/2; groundMesh.receiveShadow=true; arenaGroup.add(groundMesh);
@@ -426,6 +537,11 @@ function buildArena(mapId){
   abox(0,3,-58,118,6,1,wallMat); abox(0,3,58,118,6,1,wallMat);
   abox(-58,3,0,1,6,116,wallMat); abox(58,3,0,1,6,116,wallMat);
 
+  if(m.customObjects){
+    /* a player-built map from the Map Studio: everything on it came from that data-driven
+       object list instead of the hand-placed layout below. */
+    buildCustomLayout(m.customObjects);
+  } else {
   /* ground-level crate clusters, scattered wider across the bigger yard */
   [[0,1.4,0,10,2.8,3],[-12,1.4,-8,7,2.8,3],[12,1.4,-9,8,2.8,3],
    [-7,1.4,9,8,2.8,3],[15,1.4,9,7,2.8,3],[-19,1.4,17,4,2.8,5],[20,1.4,19,4,2.8,5],
@@ -464,6 +580,7 @@ function buildArena(mapId){
     abox(pz.x,pz.h+1.6,pz.z-pz.deckD/2+0.3,pz.deckW*.7,1.4,0.4,crateMat);
     const l=new THREE.PointLight(0xffd35a,5,14); l.position.set(pz.x,pz.h+3.4,pz.z); arenaGroup.add(l);
   });
+  }
 
   /* fold each map cell's collected blocks into one draw call per cell per material, plus one
      outline mesh per cell -- still just a handful of draw calls for anything on screen, but each
@@ -752,7 +869,7 @@ function tone(freq,dur,type,vol,glideTo){
   if(!actx) return;
   const o=actx.createOscillator(), g=actx.createGain();
   o.type=type; o.frequency.value=freq;
- if(glideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1,glideTo),actx.currentTime+dur);
+  if(glideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1,glideTo),actx.currentTime+dur);
   g.gain.value=vol; g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+dur);
   o.connect(g); g.connect(actx.destination);
   o.start(); o.stop(actx.currentTime+dur);
@@ -1137,7 +1254,10 @@ function menuHTML(isDeath){
     </div>`;
   return `<div class='lobby-top'>
       <div>${heading}</div>
-      <div class='lobby-stat'>BEST&nbsp;WAVE&nbsp;${Math.max(player.wave,1)}</div>
+      <div class='lobby-top-right'>
+        <div class='lobby-stat'>BEST&nbsp;WAVE&nbsp;${Math.max(player.wave,1)}</div>
+        ${isDeath?'':`<a class='build-map-link' href='map-studio.html'>&#128736; Build a Map</a>`}
+      </div>
     </div>
     <div class='lobby-spotlight'></div>
     <div class='lobby-dock'>
@@ -1169,13 +1289,16 @@ function buildSelectRow(containerId,defs,selectedId,onPick){
     b.className='pick'+(def.id===selectedId?' selected':'');
     if(accent) b.style.setProperty('--ac',accent);
     const swatch=def.sky?`<div class="pick-swatch" style="background:linear-gradient(160deg,${def.sky[0]},${def.sky[1]} 55%,${def.sky[2]})"></div>`:`<div class="pick-dot"></div>`;
-    b.innerHTML=`${swatch}<div class="pick-name">${def.name}</div><div class="pick-tag">${def.tag}</div>`;
+    const communityTag=def.community?`<div class="community-tag">PLAYER-MADE</div>`:'';
+    b.innerHTML=`${communityTag}${swatch}<div class="pick-name">${def.name}</div><div class="pick-tag">${def.tag}</div>`;
+    if(def.community) b.style.position='relative';
     b.onclick=()=>onPick(def.id);
     row.appendChild(b);
   });
 }
 function renderMenu(isDeath){
   paused=false;
+  lastMenuIsDeath=isDeath;
   const menu=document.getElementById('menu');
   menu.innerHTML=menuHTML(isDeath);
   menu.classList.add('show');
