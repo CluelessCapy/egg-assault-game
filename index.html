@@ -29,15 +29,16 @@ html,body{margin:0;height:100%;overflow:hidden;background:#bfe8ff;font-family:'I
 .hit.show{animation:hitpop .25s ease}
 @keyframes hitpop{0%{opacity:1;transform:translate(-50%,-50%) scale(1.4)}100%{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
 .damage{position:absolute;inset:0;border:7px solid #f33;opacity:0;transition:opacity .5s ease}
-.menu{position:absolute;inset:0;z-index:10;background:linear-gradient(180deg,#bfe8ff55 0%,#dff1ff18 25%,#dff1ff18 55%,#bfe8ffb0 100%);display:none;flex-direction:column;justify-content:space-between;align-items:stretch;text-align:center;box-sizing:border-box;overflow-y:auto}
+.menu{position:absolute;inset:0;z-index:10;background:transparent;display:none;flex-direction:column;justify-content:space-between;align-items:stretch;text-align:center;box-sizing:border-box;overflow-y:auto}
 .menu.show{display:flex}
+.menu.dim{background:rgba(15,35,58,.5)}
 .lobby-top{display:flex;justify-content:space-between;align-items:flex-start;padding:22px 26px;gap:10px}
 .lobby-title{font-family:'Chakra Petch',Arial,sans-serif;font-size:clamp(30px,6.5vw,50px);margin:0;font-weight:700;letter-spacing:-2px;color:#fff;text-shadow:-3px -3px 0 #123a5e,3px -3px 0 #123a5e,-3px 3px 0 #123a5e,3px 3px 0 #123a5e,0 7px 0 #0b263f;text-align:left}
 .lobby-title span{color:#ffd35a}
-.lobby-sub{color:#123a5e;margin:2px 0 0;text-align:left;font-weight:700;font-size:13px}
+.lobby-sub{color:#123a5e;margin:2px 0 0;text-align:left;font-weight:700;font-size:13px;text-shadow:0 1px 0 #ffffffa0}
 .lobby-stat{background:#2f8fe0;border:3px solid #fff;border-radius:14px;padding:8px 16px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700;color:#fff;font-size:14px;box-shadow:0 4px 0 #1c5f9e}
-.lobby-dock{background:#dff1ffe6;border-top:4px solid #fff;border-radius:26px 26px 0 0;padding:18px 20px 26px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:0 -6px 18px #0002}
-.lobby-spotlight{flex:1;background:radial-gradient(ellipse 240px 200px at 50% 42%,#123a5e66 0%,#123a5e00 75%)}
+.lobby-dock{background:#dff1ffe6;border-top:4px solid #fff;border-radius:26px 26px 0 0;padding:13px 20px 18px;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:0 -6px 18px #0003;max-height:50vh;overflow-y:auto}
+.lobby-spotlight{flex:1;min-height:6px;pointer-events:none}
 .btn{border:3px solid #fff;border-radius:16px;padding:16px 40px;font-weight:700;background:linear-gradient(#7de3a0,#4fbf78);color:#0c2a17;cursor:pointer;font-size:18px;font-family:'Chakra Petch',Arial,sans-serif;letter-spacing:.5px;box-shadow:0 5px 0 #2e8a52,0 8px 16px #0004;transition:transform .08s ease}
 .btn:hover{filter:brightness(1.06)}
 .btn:active{transform:translateY(3px);box-shadow:0 2px 0 #2e8a52,0 4px 10px #0004}
@@ -48,8 +49,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#bfe8ff;font-family:'I
 .btn-leave:active{transform:translateY(3px);box-shadow:0 2px 0 #b8391f,0 4px 10px #0004}
 .btn-leave:focus-visible{outline:3px solid #123a5e;outline-offset:2px}
 .hint{font-size:11.5px;color:#2c527a;line-height:1.7;max-width:520px;font-weight:600}
-.sensrow{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;color:#123a5e;font-size:12px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700}
-.sensrow input{width:150px}
+.sensrow{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;color:#123a5e;font-size:12px;font-family:'Chakra Petch',Arial,sans-serif;font-weight:700}
+.sensrow input{width:110px}
+.settings-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;width:100%}
 .select-label{font-family:'Chakra Petch',Arial,sans-serif;font-size:11px;letter-spacing:2px;color:#2c527a;margin:0 0 6px;font-weight:700}
 .select-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;max-width:620px}
 .pick{border:3px solid var(--ac,#bcdcf0);background:#ffffffd6;border-radius:14px;padding:8px 10px;min-width:82px;cursor:pointer;color:#123a5e;font-family:'Chakra Petch',Arial,sans-serif;text-align:center;transition:border-color .15s ease,background .15s ease,transform .1s ease;position:relative;box-shadow:0 3px 0 #bcdcf0}
@@ -73,9 +75,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:#bfe8ff;font-family:'I
 .kf-item.show{opacity:1;transform:translateX(0)}
 .wavebanner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.85);font-family:'Chakra Petch',Arial,sans-serif;font-size:clamp(28px,6vw,44px);font-weight:700;letter-spacing:2px;color:#ffd35a;text-shadow:-3px -3px 0 #123a5e,3px -3px 0 #123a5e,-3px 3px 0 #123a5e,3px 3px 0 #123a5e,0 4px 18px #000a;opacity:0;transition:opacity .35s ease,transform .35s ease}
 .wavebanner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
-.pause{position:absolute;inset:0;display:none;place-items:center;background:#123a5e55;pointer-events:none}
-.pause.show{display:grid}
-.pause div{background:#ffffffe8;border:3px solid #2f8fe0;border-radius:16px;padding:16px 28px;font-weight:700;letter-spacing:1px;font-family:'Chakra Petch',Arial,sans-serif;color:#123a5e}
 #map{position:absolute;left:20px;bottom:76px;width:140px;height:140px;border-radius:50%;border:3px solid #fff;background:#123a5e33;pointer-events:none}
 #scope{position:absolute;inset:0;display:none;pointer-events:none}
 #scope.show{display:block}
@@ -98,8 +97,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#bfe8ff;font-family:'I
 .respawn.show{display:grid}
 .respawn div{background:#ffffffe8;border:4px solid #e8432f;border-radius:18px;padding:16px 30px;color:#123a5e}
 .respawn b{color:#e8432f;font-size:26px;letter-spacing:1px}
-.pause.show{pointer-events:auto;cursor:pointer}
-#leaveMp{margin-top:10px;padding:8px 18px;border:3px solid #fff;border-radius:12px;background:linear-gradient(#ff9a7a,#ff6a4d);color:#4a0f04;font-weight:700;cursor:pointer;font-family:'Chakra Petch',Arial,sans-serif;font-size:12px;box-shadow:0 4px 0 #b8391f}
+.pause-hint{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:#ffffffe8;border:3px solid #2f8fe0;border-radius:14px;padding:8px 18px;font-weight:700;letter-spacing:.5px;font-family:'Chakra Petch',Arial,sans-serif;color:#123a5e;font-size:12px;pointer-events:none}
 </style>
 </head>
 <body>
@@ -117,7 +115,6 @@ html,body{margin:0;height:100%;overflow:hidden;background:#bfe8ff;font-family:'I
     <div class='wavebanner' id='wavebanner'></div>
     <div class='killfeed' id='killfeed'></div>
     <div class='leaderboard' id='leaderboard' style='display:none'></div>
-    <div class='pause' id='pause'><div>CLICK TO RESUME AIMING</div></div>
     <canvas id='map' width='140' height='140'></canvas>
     <div class='bottom'>
       <div class='hp'><b>HEALTH <span id='hp'>100</span></b><div class='bar'><div class='fill' id='fill'></div></div></div>
@@ -496,17 +493,50 @@ function buildArena(mapId){
 }
 buildArena(selectedMapId);
 
-/* ---------- lobby preview character (shown rotating behind the menu) ---------- */
+/* ---------- lobby preview character (shown rotating behind the menu) ----------
+   Parked far away on its own +Z axis (well past the fog's draw distance) so the
+   real arena never shows up behind it, no matter how the preview camera is framed. */
+const PREVIEW_Z=-260;
 const previewEgg=new THREE.Group();
-previewEgg.position.set(0,16,0);
+previewEgg.position.set(0,16,PREVIEW_Z);
 previewEgg.visible=false;
 scene.add(previewEgg);
-const previewLight=new THREE.PointLight(0xfff2d0,6,14);
-previewLight.position.set(1.2,18.4,2.2);
+const previewLight=new THREE.PointLight(0xfff2d0,6,16);
+previewLight.position.set(1.2,18.4,PREVIEW_Z+2.2);
 scene.add(previewLight);
-const previewLight2=new THREE.PointLight(0x8fd1ff,2.5,14);
-previewLight2.position.set(-2,15.5,-1.5);
+const previewLight2=new THREE.PointLight(0x8fd1ff,2.5,16);
+previewLight2.position.set(-2,15.5,PREVIEW_Z-1.5);
 scene.add(previewLight2);
+/* a bright yard patch (fading into the fog at the horizon) plus a soft contact shadow
+   under the lobby character, so it reads as standing in a sunny spot rather than
+   floating in empty sky */
+function makeShadowBlobTexture(){
+  const cvs=document.createElement('canvas'); cvs.width=128; cvs.height=128;
+  const ctx=cvs.getContext('2d');
+  const g=ctx.createRadialGradient(64,64,4,64,64,63);
+  g.addColorStop(0,'rgba(12,28,48,0.42)');
+  g.addColorStop(.65,'rgba(12,28,48,0.18)');
+  g.addColorStop(1,'rgba(12,28,48,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(cvs);
+}
+const previewGround=new THREE.Mesh(
+  new THREE.CircleGeometry(60,36),
+  new THREE.MeshBasicMaterial({color:0xeaf7ff,transparent:true,opacity:.85,depthWrite:false,fog:true})
+);
+previewGround.rotation.x=-Math.PI/2;
+previewGround.position.set(0,15.9,PREVIEW_Z);
+previewGround.visible=false;
+previewGround.renderOrder=-1;
+scene.add(previewGround);
+const previewShadow=new THREE.Mesh(
+  new THREE.PlaneGeometry(1.8,1.8),
+  new THREE.MeshBasicMaterial({map:makeShadowBlobTexture(),transparent:true,depthWrite:false})
+);
+previewShadow.rotation.x=-Math.PI/2;
+previewShadow.position.set(0,15.95,PREVIEW_Z+.22);
+previewShadow.visible=false;
+scene.add(previewShadow);
 function updatePreviewWeapon(){
   while(previewEgg.children.length) previewEgg.remove(previewEgg.children[0]);
   previewEgg.add(egg(BOT_TYPES.yolk));
@@ -722,7 +752,7 @@ function tone(freq,dur,type,vol,glideTo){
   if(!actx) return;
   const o=actx.createOscillator(), g=actx.createGain();
   o.type=type; o.frequency.value=freq;
-  if(glideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1,glideTo),actx.currentTime+dur);
+ if(glideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1,glideTo),actx.currentTime+dur);
   g.gain.value=vol; g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+dur);
   o.connect(g); g.connect(actx.destination);
   o.start(); o.stop(actx.currentTime+dur);
@@ -759,7 +789,7 @@ const velocity=new THREE.Vector3();
 const player={hp:100,ammo:10,reserve:60,kills:0,wave:1,yaw:0,pitch:0,vy:0,onGround:true,reloading:false,cd:0,lastHit:0};
 const keys={};
 let bots=[], parts=[], tracers=[], bullets=[];
-let playing=false, locked=false, dead=false, mouseDown=false, isZoomed=false;
+let playing=false, locked=false, dead=false, mouseDown=false, isZoomed=false, paused=false;
 let sensitivity=.0022, shakeMag=0, recoilPitch=0, reserveAcc=0, reloadTimer=0, walkPhase=0;
 let lastFov=76;
 
@@ -847,18 +877,54 @@ function pushKillFeed(text){
   while(feed.children.length>4) feed.removeChild(feed.lastChild);
 }
 function addKillFeed(type){ pushKillFeed('CRACKED '+BOT_TYPES[type].label); }
-function setPause(show){
-  const el=document.getElementById('pause');
-  el.classList.toggle('show',show);
-  if(show){
-    el.innerHTML=mp.active
-      ?`<div>CLICK TO RESUME AIMING<br><button id='leaveMp' type='button'>LEAVE MATCH</button></div>`
-      :`<div>CLICK TO RESUME AIMING</div>`;
-    el.onclick=(e)=>{
-      if(e.target&&e.target.id==='leaveMp'){ e.stopPropagation(); mpLeaveMatch(); return; }
-      requestLock();
-    };
-  }
+
+/* ---------- pause menu (opened by losing pointer lock, e.g. pressing ESC) ---------- */
+function pauseHTML(){
+  return `<div class='lobby-top'>
+      <div><div class='lobby-title'>PAUSED</div><div class='lobby-sub' style='color:#fff;text-shadow:0 1px 4px #0009'>Wave ${player.wave} &middot; ${player.kills} kills</div></div>
+      <div class='lobby-stat'>BEST&nbsp;WAVE&nbsp;${Math.max(player.wave,1)}</div>
+    </div>
+    <div class='lobby-spotlight'></div>
+    <div class='lobby-dock'>
+      <div class='btn-row'><button class='btn' id='resumeBtn' type='button'>RESUME</button></div>
+      <button class='btn-leave' id='leaveBtn' type='button'>LEAVE</button>
+      <div class='sensrow'>MOUSE SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
+      <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
+      <div class='hint'>Press <b>ESC</b> or tap RESUME to keep playing.</div>
+    </div>`;
+}
+function renderPauseMenu(){
+  const menu=document.getElementById('menu');
+  menu.innerHTML=pauseHTML();
+  menu.classList.add('show','dim');
+  document.getElementById('resumeBtn').onclick=closePauseMenu;
+  document.getElementById('leaveBtn').onclick=leaveToLobby;
+  document.getElementById('sens').addEventListener('input',e=>{ sensitivity=e.target.value/10000; });
+  document.getElementById('gfxBtn').onclick=()=>{ lowGraphics=!lowGraphics; applyGraphics(); renderPauseMenu(); };
+}
+function openPauseMenu(){
+  if(!playing||dead||paused) return;
+  paused=true;
+  mouseDown=false;
+  document.exitPointerLock?.();
+  document.querySelector('.hud').style.visibility='hidden';
+  renderPauseMenu();
+}
+function closePauseMenu(){
+  if(!paused) return;
+  paused=false;
+  document.getElementById('menu').classList.remove('show','dim');
+  document.querySelector('.hud').style.visibility='visible';
+  requestLock();
+}
+function leaveToLobby(){
+  paused=false;
+  playing=false; dead=false;
+  document.exitPointerLock?.();
+  if(mp.active) mpDisconnect();
+  lobbyMode='solo';
+  hideRespawnScreen();
+  renderMenu(false);
 }
 
 /* ---------- multiplayer networking ---------- */
@@ -882,7 +948,7 @@ function mpConnect(url,room,name){
     Object.keys(mp.players).forEach(removeRemotePlayer);
     const lb=document.getElementById('leaderboard'); if(lb) lb.style.display='none';
     mpStatus(wasConnected?'Disconnected from server.':'Could not connect. Check the server URL.');
-    if(playing&&!dead){ playing=false; dead=false; document.exitPointerLock?.(); setPause(false); hideRespawnScreen(); }
+    if(playing&&!dead){ playing=false; dead=false; paused=false; document.exitPointerLock?.(); hideRespawnScreen(); }
     renderMenu(false);
   };
   ws.onerror=()=>{};
@@ -896,9 +962,8 @@ function mpDisconnect(){
 function mpSend(obj){ if(mp.ws&&mp.ws.readyState===1) mp.ws.send(JSON.stringify(obj)); }
 function mpLeaveMatch(){
   mpDisconnect();
-  playing=false; dead=false;
+  playing=false; dead=false; paused=false;
   document.exitPointerLock?.();
-  setPause(false);
   hideRespawnScreen();
   renderMenu(false);
 }
@@ -1078,21 +1143,24 @@ function menuHTML(isDeath){
     <div class='lobby-dock'>
       <div class='select-label'>WEAPON</div>
       <div class='select-row' id='weaponRow'></div>
-      <div class='select-label'>MAP</div>
-      <div class='select-row' id='mapRow'></div>
+      ${isDeath?'':`<div class='select-label'>MAP</div>
+      <div class='select-row' id='mapRow'></div>`}
       <div class='mp-toggle'>
         <button type='button' class='mp-tab${lobbyMode==='solo'?' selected':''}' id='tabSolo'>SURVIVAL</button>
         <button type='button' class='mp-tab${lobbyMode==='mp'?' selected':''}' id='tabMp'>MULTIPLAYER</button>
       </div>
       ${lobbyMode==='mp'?mpPanel:`<div class='btn-row'><button class='btn' id='play'>${isDeath?'PLAY AGAIN':'PLAY'}</button></div>`}
       ${isDeath?`<button class='btn-leave' id='leaveBtn' type='button'>LEAVE</button>`:''}
-      <div class='sensrow'>MOUSE SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
-      <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
-      <div class='hint'><b>WASD</b> move &middot; <b>MOUSE</b> aim &middot; <b>CLICK</b> fire &middot; <b>R</b> reload &middot; <b>SHIFT</b> sprint &middot; <b>SPACE</b> jump &middot; right-click to scope (sniper)</div>
+      <div class='settings-row'>
+        <div class='sensrow'>SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
+        <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
+      </div>
+      ${isDeath?'':`<div class='hint'><b>WASD</b> move &middot; <b>MOUSE</b> aim &middot; <b>CLICK</b> fire &middot; <b>R</b> reload &middot; <b>SHIFT</b> sprint &middot; <b>SPACE</b> jump &middot; right-click to scope (sniper)</div>`}
     </div>`;
 }
 function buildSelectRow(containerId,defs,selectedId,onPick){
   const row=document.getElementById(containerId);
+  if(!row) return;
   row.innerHTML='';
   Object.values(defs).forEach(def=>{
     const b=document.createElement('button');
@@ -1107,11 +1175,17 @@ function buildSelectRow(containerId,defs,selectedId,onPick){
   });
 }
 function renderMenu(isDeath){
+  paused=false;
   const menu=document.getElementById('menu');
   menu.innerHTML=menuHTML(isDeath);
   menu.classList.add('show');
+  menu.classList.remove('dim');
   document.querySelector('.hud').style.visibility='hidden';
   previewEgg.visible=true;
+  previewGround.visible=true;
+  previewShadow.visible=true;
+  arenaGroup.visible=false;
+  weapon.visible=false;
   buildSelectRow('weaponRow',WEAPON_DEFS,selectedWeaponId,id=>{ selectedWeaponId=id; updatePreviewWeapon(); renderMenu(isDeath); });
   buildSelectRow('mapRow',MAP_DEFS,selectedMapId,id=>{ selectedMapId=id; buildArena(selectedMapId); renderMenu(isDeath); });
   document.getElementById('sens').addEventListener('input',e=>{ sensitivity=e.target.value/10000; });
@@ -1360,8 +1434,8 @@ function damage(n){
 
 function killPlayer(){
   dead=true;
+  paused=false;
   document.exitPointerLock?.();
-  setPause(false);
   isZoomed=false;
   document.getElementById('scope').classList.remove('show');
   renderMenu(true);
@@ -1386,7 +1460,7 @@ function startGame(isMp){
   isZoomed=false; mouseDown=false;
   document.getElementById('scope').classList.remove('show');
   document.getElementById('cross').classList.remove('hidden');
-  dead=false; playing=true;
+  dead=false; playing=true; paused=false;
 
   mp.active=!!isMp;
   document.getElementById('mapTag').textContent=mp.active?('MULTIPLAYER • ROOM '+(mp.room||'MAIN').toUpperCase()):'URBAN YOLK • ONLINE TRAINING';
@@ -1395,9 +1469,13 @@ function startGame(isMp){
 
   updateHpUI(); updateAmmoUI();
   document.getElementById('score').textContent='0 KILLS';
-  document.getElementById('menu').classList.remove('show');
+  document.getElementById('menu').classList.remove('show','dim');
   document.querySelector('.hud').style.visibility='visible';
   previewEgg.visible=false;
+  previewGround.visible=false;
+  previewShadow.visible=false;
+  arenaGroup.visible=true;
+  weapon.visible=true;
   if(mp.active){
     Object.values(mp.players).forEach(rp=>{ rp.g.position.set(rp.targetPos.x,0,rp.targetPos.z); });
   } else {
@@ -1418,6 +1496,9 @@ addEventListener('keydown',e=>{
   if(e.code==='Space'){
     e.preventDefault();
     if(player.onGround&&playing&&!dead){ player.vy=JUMP_SPEED; player.onGround=false; sfx.jump(); }
+  }
+  if(e.key==='Escape'&&playing&&!dead){
+    if(paused) closePauseMenu(); else openPauseMenu();
   }
 });
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
@@ -1444,9 +1525,9 @@ addEventListener('mouseup',e=>{
 
 document.addEventListener('pointerlockchange',()=>{
   locked=document.pointerLockElement===canvasEl;
-  if(playing&&!dead) setPause(!locked);
+  if(!locked&&playing&&!dead&&!paused) openPauseMenu();
 });
-document.addEventListener('pointerlockerror',()=>{ setPause(true); });
+document.addEventListener('pointerlockerror',()=>{ if(playing&&!dead&&!paused) openPauseMenu(); });
 
 document.addEventListener('mousemove',e=>{
   if(!locked||dead) return;
@@ -1488,6 +1569,7 @@ const _fwdV=new THREE.Vector3();
 const _rightV=new THREE.Vector3();
 const _botTmpV=new THREE.Vector3();
 function update(dt){
+  if(paused) return;
   if(mp.active){
     for(const rp of Object.values(mp.players)){
       const lerpT=Math.min(1,dt*12);
@@ -1501,8 +1583,8 @@ function update(dt){
   if(!playing||dead){
     if(previewEgg.visible){
       previewEgg.rotation.y+=dt*.6;
-      cam.position.set(0,17.15,5.6);
-      cam.rotation.set(-.12,0,0);
+      cam.position.set(0,19,PREVIEW_Z+10);
+      cam.lookAt(0,13.5,PREVIEW_Z);
     }
     return;
   }
@@ -1531,7 +1613,8 @@ function update(dt){
     if(keys.w) wish.add(fwd);
     if(keys.s) wish.sub(fwd);
     if(keys.d) wish.add(right);
-    if(keys.a) wish.sub(right);    moving=wish.lengthSq()>0.0001;
+    if(keys.a) wish.sub(right);
+    moving=wish.lengthSq()>0.0001;
     let targetX=0,targetZ=0;
     if(moving){ wish.normalize().multiplyScalar(sp); targetX=wish.x; targetZ=wish.z; }
     const accel=Math.min(1,14*dt);
