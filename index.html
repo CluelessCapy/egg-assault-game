@@ -386,13 +386,21 @@ function buildArena(mapId){
   sun.color.set(m.sun);
   document.getElementById('mapTag').textContent=m.tag.toUpperCase()+' • ONLINE TRAINING';
 
-  /* static blocks are collected here and batched into a few merged meshes at the end of
-     buildArena, instead of one mesh + one outline mesh per block (same look, way fewer draw calls) */
-  const wallGeoms=[], crateGeoms=[], pillarGeoms=[], outlineGeoms=[];
+  /* static blocks are collected here and batched into merged meshes at the end of buildArena --
+     one mesh per ~24-unit map cell per material (instead of one mesh per block, which was many
+     draw calls, or one giant mesh for the whole map, which drew the entire map every frame
+     whether it was on screen or not). Chunking by cell keeps the "few draw calls" win but lets
+     three.js's normal frustum culling skip whole cells that are behind or off to the side of the
+     camera, so what actually gets sent to the GPU shrinks as you look around the map. */
+  const CHUNK_SIZE=24;
+  const chunkBuckets={}, outlineBuckets={};
+  function cellKey(x,z){ return Math.floor(x/CHUNK_SIZE)+'_'+Math.floor(z/CHUNK_SIZE); }
   function abox(x,y,z,w,h,d,mat){
     const geo=new THREE.BoxGeometry(w,h,d);
-    (mat===wallMat?wallGeoms:mat===crateMat?crateGeoms:pillarGeoms).push(geo.clone().translate(x,y,z));
-    outlineGeoms.push(geo.clone().scale(1.045,1.045,1.045).translate(x,y,z));
+    const kind=mat===wallMat?'wall':mat===crateMat?'crate':'pillar';
+    const cell=cellKey(x,z);
+    (chunkBuckets[kind+'|'+cell]||(chunkBuckets[kind+'|'+cell]=[])).push(geo.clone().translate(x,y,z));
+    (outlineBuckets[cell]||(outlineBuckets[cell]=[])).push(geo.clone().scale(1.045,1.045,1.045).translate(x,y,z));
     geo.dispose();
   }
   function asolid(x,y,z,w,h,d,mat){ abox(x,y,z,w,h,d,mat); colliders.push({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}); }
@@ -454,7 +462,10 @@ function buildArena(mapId){
     const l=new THREE.PointLight(0xffd35a,5,14); l.position.set(pz.x,pz.h+3.4,pz.z); arenaGroup.add(l);
   });
 
-  /* fold every collected block into one draw call per material, plus one shared outline mesh */
+  /* fold each map cell's collected blocks into one draw call per cell per material, plus one
+     outline mesh per cell -- still just a handful of draw calls for anything on screen, but each
+     one now only covers a small patch of the map so off-screen cells get culled automatically */
+  const matByKind={wall:wallMat,crate:crateMat,pillar:pillarMat};
   function addMerged(geoms,mat){
     if(!geoms.length) return;
     const merged=mergeBoxGeoms(geoms);
@@ -463,16 +474,19 @@ function buildArena(mapId){
     mesh.castShadow=mesh.receiveShadow=true;
     arenaGroup.add(mesh);
   }
-  addMerged(wallGeoms,wallMat);
-  addMerged(crateGeoms,crateMat);
-  addMerged(pillarGeoms,pillarMat);
-  if(outlineGeoms.length){
-    const mergedOutline=mergeBoxGeoms(outlineGeoms);
-    outlineGeoms.forEach(g=>g.dispose());
+  Object.keys(chunkBuckets).forEach(key=>{
+    const kind=key.slice(0,key.indexOf('|'));
+    addMerged(chunkBuckets[key],matByKind[kind]);
+  });
+  Object.keys(outlineBuckets).forEach(cell=>{
+    const geoms=outlineBuckets[cell];
+    if(!geoms.length) return;
+    const mergedOutline=mergeBoxGeoms(geoms);
+    geoms.forEach(g=>g.dispose());
     const outMesh=new THREE.Mesh(mergedOutline,outlineMat);
     outMesh.renderOrder=-1;
     arenaGroup.add(outMesh);
-  }
+  });
 }
 buildArena(selectedMapId);
 
@@ -1040,8 +1054,7 @@ function menuHTML(isDeath){
   return `<div class='lobby-top'>
       <div>${heading}</div>
       <div class='lobby-stat'>BEST&nbsp;WAVE&nbsp;${Math.max(player.wave,1)}</div>
-    </div>
-    <div></div>
+    </div>    <div></div>
     <div class='lobby-dock'>
       <div class='select-label'>WEAPON</div>
       <div class='select-row' id='weaponRow'></div>
@@ -1590,7 +1603,8 @@ function update(dt){
   }
   for(let i=bullets.length-1;i>=0;i--){
     const b=bullets[i];
-    b.t+=dt;    const travel=Math.min(b.dist,b.speed*b.t);
+    b.t+=dt;
+    const travel=Math.min(b.dist,b.speed*b.t);
     b.mesh.position.copy(b.from).addScaledVector(b.dir,travel);
     b.mesh.material.opacity=Math.max(0,1-travel/b.dist)*.95;
     if(travel>=b.dist-0.01||b.t>0.5){ scene.remove(b.mesh); b.mesh.material.dispose(); bullets.splice(i,1); }
