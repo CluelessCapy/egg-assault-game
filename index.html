@@ -155,8 +155,19 @@ let selectedWeaponId='ar', selectedMapId='yolkyard';
 
 /* ---------- renderer / scene ---------- */
 const canvasEl=document.getElementById('c');
-/* rough heuristic: low core count or no high dpi headroom usually means an integrated/school-laptop GPU */
-let lowGraphics=(navigator.hardwareConcurrency||4)<=4;
+/* detect a weak/school-laptop GPU: low core count, low device memory, or an integrated/software renderer */
+function detectWeakDevice(){
+  if((navigator.hardwareConcurrency||4)<=4) return true;
+  if(navigator.deviceMemory&&navigator.deviceMemory<=4) return true;
+  try{
+    const probe=document.createElement('canvas').getContext('webgl');
+    const info=probe&&probe.getExtension('WEBGL_debug_renderer_info');
+    const rendererStr=info?(probe.getParameter(info.UNMASKED_RENDERER_WEBGL)||''):'';
+    if(/intel|swiftshader|software|llvmpipe|microsoft basic/i.test(rendererStr)) return true;
+  }catch(e){}
+  return false;
+}
+let lowGraphics=detectWeakDevice();
 const renderer=new THREE.WebGLRenderer({canvas:canvasEl,antialias:!lowGraphics,powerPreference:'high-performance'});
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 function applyGraphics(){
@@ -1091,9 +1102,35 @@ function renderMenu(isDeath){
 }
 
 /* ---------- particles / tracers / bullets ---------- */
+/* shared geometry/material pools: shot sparks and shell bursts used to allocate a fresh
+   geometry+material every single shot and kill and never disposed them, which slowly leaked
+   GPU memory for the whole match. Reusing a small shared pool fixes that leak and also avoids
+   the constant garbage-collection churn that shows up as stutter during heavy firefights. */
+const sparkGeo=new THREE.SphereGeometry(.045,6,5);
+const sparkMat=new THREE.MeshBasicMaterial({color:0xffd35a});
+const shellGeoPool=(()=>{ const arr=[]; for(let i=0;i<6;i++) arr.push(new THREE.ConeGeometry(.05+Math.random()*.04,.09+Math.random()*.06,4)); return arr; })();
+const shellMatCache={};
+function shellMatFor(colorHex){ let m=shellMatCache[colorHex]; if(!m){ m=new THREE.MeshBasicMaterial({color:colorHex}); shellMatCache[colorHex]=m; } return m; }
+const tracerGeoCache={};
+function tracerGeoFor(def){
+  let g=tracerGeoCache[def.id];
+  if(!g){
+    g=new THREE.CylinderGeometry(def.tracerWidth,def.tracerWidth,1,6);
+    g.rotateX(Math.PI/2);
+    g.translate(0,0,-.5);
+    tracerGeoCache[def.id]=g;
+  }
+  return g;
+}
+const NEG_Z=new THREE.Vector3(0,0,-1);
+const MAX_PARTS=lowGraphics?90:220;
+const MAX_BULLETS=lowGraphics?32:64;
+
 function burst(p){
-  for(let i=0;i<8;i++){
-    const m=new THREE.Mesh(new THREE.SphereGeometry(.045,6,5),new THREE.MeshBasicMaterial({color:0xffd35a}));
+  if(parts.length>MAX_PARTS) return;
+  const n=lowGraphics?4:8;
+  for(let i=0;i<n;i++){
+    const m=new THREE.Mesh(sparkGeo,sparkMat);
     m.position.copy(p);
     m.userData.v=new THREE.Vector3((Math.random()-.5)*4,Math.random()*3,(Math.random()-.5)*4);
     m.userData.life=.3;
@@ -1101,8 +1138,12 @@ function burst(p){
   }
 }
 function shellBurst(pos,colorHex){
-  for(let i=0;i<10;i++){
-    const m=new THREE.Mesh(new THREE.ConeGeometry(.05+Math.random()*.04,.09+Math.random()*.06,4),new THREE.MeshBasicMaterial({color:colorHex}));
+  if(parts.length>MAX_PARTS) return;
+  const mat=shellMatFor(colorHex);
+  const n=lowGraphics?5:10;
+  for(let i=0;i<n;i++){
+    const geo=shellGeoPool[(Math.random()*shellGeoPool.length)|0];
+    const m=new THREE.Mesh(geo,mat);
     m.position.copy(pos); m.position.y+=.3;
     m.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
     m.userData.v=new THREE.Vector3((Math.random()-.5)*5,2+Math.random()*3,(Math.random()-.5)*5);
@@ -1112,17 +1153,17 @@ function shellBurst(pos,colorHex){
   }
 }
 function spawnBullet(from,to,def){
+  if(bullets.length>=MAX_BULLETS) return;
   const dir=new THREE.Vector3().subVectors(to,from);
   const dist=Math.max(.001,dir.length());
   dir.normalize();
   const len=Math.min(1.1,Math.max(.18,dist*.1));
-  const geo=new THREE.CylinderGeometry(def.tracerWidth,def.tracerWidth,len,6);
-  geo.rotateX(Math.PI/2);
-  geo.translate(0,0,-len/2);
+  const geo=tracerGeoFor(def);
   const mat=new THREE.MeshBasicMaterial({color:def.tracerColor,transparent:true,opacity:.95});
   const mesh=new THREE.Mesh(geo,mat);
+  mesh.scale.z=len;
   mesh.position.copy(from);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1),dir);
+  mesh.quaternion.setFromUnitVectors(NEG_Z,dir);
   scene.add(mesh);
   bullets.push({mesh,from:from.clone(),dir,dist,speed:def.bulletSpeed,t:0});
 }
@@ -1288,7 +1329,7 @@ function startGame(isMp){
   bots.forEach(b=>scene.remove(b.g)); bots.length=0;
   parts.forEach(p=>scene.remove(p)); parts.length=0;
   tracers.forEach(t=>scene.remove(t.line)); tracers.length=0;
-  bullets.forEach(b=>{ scene.remove(b.mesh); b.mesh.geometry.dispose(); b.mesh.material.dispose(); }); bullets.length=0;
+  bullets.forEach(b=>{ scene.remove(b.mesh); b.mesh.material.dispose(); }); bullets.length=0;
 
   buildArena(selectedMapId);
   equipWeapon(WEAPON_DEFS[selectedWeaponId]);
@@ -1395,6 +1436,14 @@ function bootStep(){
 setTimeout(bootStep,230);
 
 /* ---------- main loop ---------- */
+/* reusable scratch vectors: the movement and bot-AI code below used to allocate fresh
+   THREE.Vector3 objects every single frame, which forces the browser's garbage collector
+   to run constantly during play — that shows up as little stutters/hitches, especially on
+   slower machines. Reusing the same vector objects avoids that entirely. */
+const _wishV=new THREE.Vector3();
+const _fwdV=new THREE.Vector3();
+const _rightV=new THREE.Vector3();
+const _botTmpV=new THREE.Vector3();
 function update(dt){
   if(mp.active){
     for(const rp of Object.values(mp.players)){
@@ -1433,18 +1482,19 @@ function update(dt){
   let moving=false;
   if(locked){
     const sp=keys.shift?8:5.3;
-    const wish=new THREE.Vector3();
-    const fwd=new THREE.Vector3(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
-    const right=new THREE.Vector3(Math.cos(player.yaw),0,-Math.sin(player.yaw));
+    const wish=_wishV.set(0,0,0);
+    const fwd=_fwdV.set(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
+    const right=_rightV.set(Math.cos(player.yaw),0,-Math.sin(player.yaw));
     if(keys.w) wish.add(fwd);
     if(keys.s) wish.sub(fwd);
     if(keys.d) wish.add(right);
     if(keys.a) wish.sub(right);
     moving=wish.lengthSq()>0.0001;
-    const target=moving?wish.normalize().multiplyScalar(sp):new THREE.Vector3();
+    let targetX=0,targetZ=0;
+    if(moving){ wish.normalize().multiplyScalar(sp); targetX=wish.x; targetZ=wish.z; }
     const accel=Math.min(1,14*dt);
-    velocity.x+=(target.x-velocity.x)*accel;
-    velocity.z+=(target.z-velocity.z)*accel;
+    velocity.x+=(targetX-velocity.x)*accel;
+    velocity.z+=(targetZ-velocity.z)*accel;
     playerPos.x+=velocity.x*dt; playerPos.z+=velocity.z*dt;
     resolveCollisions(playerPos,PLAYER_RADIUS);
     playerPos.x=THREE.MathUtils.clamp(playerPos.x,-ARENA_LIMIT,ARENA_LIMIT);
@@ -1491,9 +1541,9 @@ function update(dt){
     if(d>3.2){
       bot.g.position.x+=dx/d*bot.speed*dt;
       bot.g.position.z+=dz/d*bot.speed*dt;
-      const bp=new THREE.Vector3(bot.g.position.x,0,bot.g.position.z);
-      resolveCollisions(bp,.55);
-      bot.g.position.x=bp.x; bot.g.position.z=bp.z;
+      _botTmpV.set(bot.g.position.x,0,bot.g.position.z);
+      resolveCollisions(_botTmpV,.55);
+      bot.g.position.x=_botTmpV.x; bot.g.position.z=_botTmpV.z;
     } else {
       bot.attackT-=dt;
       if(bot.attackT<0){
@@ -1540,11 +1590,10 @@ function update(dt){
   }
   for(let i=bullets.length-1;i>=0;i--){
     const b=bullets[i];
-    b.t+=dt;
-    const travel=Math.min(b.dist,b.speed*b.t);
+    b.t+=dt;    const travel=Math.min(b.dist,b.speed*b.t);
     b.mesh.position.copy(b.from).addScaledVector(b.dir,travel);
     b.mesh.material.opacity=Math.max(0,1-travel/b.dist)*.95;
-    if(travel>=b.dist-0.01||b.t>0.5){ scene.remove(b.mesh); b.mesh.geometry.dispose(); b.mesh.material.dispose(); bullets.splice(i,1); }
+    if(travel>=b.dist-0.01||b.t>0.5){ scene.remove(b.mesh); b.mesh.material.dispose(); bullets.splice(i,1); }
   }
 
   if(mp.active){
