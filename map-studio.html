@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Egg Assault Map Studio</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sky-top:#4fb2f2; --sky-bot:#dff3ff;
+    --panel:#fffaf0; --panel-edge:#ffffff; --panel-line:#e7dcc2;
+    --ink:#1c2340; --ink-soft:#5a6484;
+    --accent:#ff8c4d; --accent-dark:#c9612a;
+    --good:#62d391; --good-dark:#2f9d63;
+    --bad:#f2564a; --bad-dark:#b23327;
+    --info:#4fa8d6; --info-dark:#2c6f92;
+    --chip:#eef6fb; --chip-line:#cfe4f0;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; overflow:hidden;
+    font-family:'Inter',system-ui,sans-serif; color:var(--ink);
+    background:linear-gradient(180deg,var(--sky-top),var(--sky-bot));
+  }
+  h1,h2,h3,.display{font-family:'Baloo 2',system-ui,sans-serif}
+  .app{
+    display:flex; height:100dvh; height:100vh;
+    padding:14px; padding-block:calc(14px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-bottom,0px));
+    gap:12px;
+  }
+  @media (max-width:820px){ .app{flex-direction:column-reverse; padding:10px; gap:8px} }
+
+  /* ---- sidebar ---- */
+  .panel{
+    width:320px; flex:none; background:var(--panel); border:3px solid var(--panel-edge);
+    outline:2px solid var(--panel-line); border-radius:20px; padding:14px;
+    box-shadow:0 10px 24px #17335522; overflow-y:auto; display:flex; flex-direction:column; gap:14px;
+  }
+  @media (max-width:820px){ .panel{width:auto; max-height:48vh} }
+
+  .back-link{
+    display:inline-flex; align-items:center; gap:4px; align-self:flex-start;
+    color:var(--info-dark); font:700 12px 'Inter',sans-serif; text-decoration:none;
+    background:var(--chip); border:2px solid var(--chip-line); padding:5px 10px; border-radius:100px;
+  }
+  .back-link:hover{background:var(--chip-line)}
+
+  .brand{display:flex; align-items:center; gap:10px}
+  .brand-badge{
+    width:38px;height:38px;border-radius:11px;flex:none;
+    background:linear-gradient(160deg,#fff6df,#ffd35a 60%,#ffb347);
+    border:2px solid #fff; box-shadow:0 3px 0 #d99a2c66, inset 0 -3px 0 #0001;
+  }
+  .brand h1{margin:0;font-size:19px;line-height:1.05;color:var(--ink)}
+  .brand p{margin:1px 0 0;font-size:11.5px;color:var(--ink-soft);font-weight:600;letter-spacing:.02em}
+
+  .tip{
+    background:var(--chip); border:2px solid var(--chip-line); border-radius:12px; padding:9px 10px;
+    font-size:11.5px; font-weight:600; color:var(--ink-soft); line-height:1.45; position:relative; display:none;
+  }
+  .tip.show{display:block}
+  .tip b{color:var(--ink)}
+  .tip-close{
+    position:absolute; top:5px; right:6px; border:none; background:none; cursor:pointer;
+    font:800 13px sans-serif; color:var(--ink-soft); line-height:1; padding:2px 4px;
+  }
+
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase}
+  .field input[type=text]{
+    font:600 14px 'Inter',sans-serif; padding:8px 10px; border-radius:10px;
+    border:2px solid var(--chip-line); background:var(--chip); color:var(--ink);
+  }
+  .field input[type=text]:focus{outline:2px solid var(--info); outline-offset:1px}
+
+  .section-title{font-size:11px;font-weight:800;letter-spacing:.07em;color:var(--ink-soft);text-transform:uppercase;margin:0}
+
+  .theme-row{display:grid; grid-template-columns:repeat(5,1fr); gap:6px}
+  .theme-swatch{
+    height:34px;border-radius:9px;border:2px solid #fff;cursor:pointer;position:relative;
+    box-shadow:0 2px 0 #0002; padding:0;
+  }
+  .theme-swatch.sel{outline:3px solid var(--accent); outline-offset:1px}
+
+  .tab-row{display:flex; gap:6px; background:var(--chip); border:2px solid var(--chip-line); border-radius:12px; padding:3px}
+  .tab-btn{
+    flex:1; border:none; background:transparent; border-radius:9px; padding:7px 4px; cursor:pointer;
+    font:800 11.5px 'Inter',sans-serif; color:var(--ink-soft);
+  }
+  .tab-btn.sel{background:#fff; color:var(--ink); box-shadow:0 2px 0 #0001}
+
+  .tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tool-btn{
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    padding:9px 6px 8px; border-radius:12px; border:2px solid var(--chip-line); background:var(--chip);
+    cursor:pointer; font:700 11.5px 'Inter',sans-serif; color:var(--ink);
+  }
+  .tool-btn:active{transform:translateY(1px)}
+  .tool-btn.armed{background:#fff3e8; border-color:var(--accent); box-shadow:0 0 0 3px #ff8c4d33}
+  .swatch-shape{width:100%;height:22px;display:flex;align-items:flex-end;justify-content:center}
+  .sh-wall{width:78%;height:60%;background:#e6c383;border:1.5px solid #00000022;border-radius:3px}
+  .sh-crate{width:60%;height:100%;background:#c98a45;border:1.5px solid #00000022;border-radius:3px}
+  .sh-pillar{width:26%;height:100%;background:#c7ccd4;border:1.5px solid #00000022;border-radius:2px}
+  .sh-platform{width:82%;height:34%;background:#c7ccd4;border:1.5px solid #00000022;border-radius:3px;align-self:flex-end}
+  .sh-ramp{width:0;height:0;border-left:26px solid transparent;border-bottom:20px solid #c98a45}
+
+  .prefab-list{display:flex;flex-direction:column;gap:6px}
+  .prefab-btn{
+    display:flex; align-items:center; gap:10px; text-align:left; font:700 12px 'Inter',sans-serif;
+    color:var(--ink); background:var(--chip); border:2px solid var(--chip-line); border-radius:12px;
+    padding:8px 10px; cursor:pointer;
+  }
+  .prefab-btn.armed{background:#fff3e8; border-color:var(--accent); box-shadow:0 0 0 3px #ff8c4d33}
+  .prefab-btn .emoji{font-size:20px; flex:none; width:24px; text-align:center}
+  .prefab-btn small{display:block;font-weight:500;color:var(--ink-soft);font-size:10.5px;margin-top:1px}
+
+  .btn{
+    font:800 13px 'Baloo 2',sans-serif; letter-spacing:.02em; border:none; border-radius:12px;
+    padding:10px 12px; cursor:pointer; color:#fff; width:100%;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.6; cursor:default; transform:none}
+  .btn-accent{background:var(--accent); box-shadow:0 4px 0 var(--accent-dark)}
+  .btn-good{background:var(--good); box-shadow:0 4px 0 var(--good-dark)}
+  .btn-bad{background:var(--bad); box-shadow:0 4px 0 var(--bad-dark)}
+  .btn-info{background:var(--info); box-shadow:0 4px 0 var(--info-dark)}
+  .btn-ghost{background:var(--chip); color:var(--ink); box-shadow:0 3px 0 var(--chip-line)}
+  .btn-row{display:flex;gap:8px}
+  .btn-row .btn{flex:1}
+
+  .templates{display:flex;flex-direction:column;gap:6px}
+  .tpl-btn{
+    text-align:left; font:700 12px 'Inter',sans-serif; color:var(--ink); background:var(--chip);
+    border:2px solid var(--chip-line); border-radius:10px; padding:8px 10px; cursor:pointer;
+  }
+  .tpl-btn small{display:block;font-weight:500;color:var(--ink-soft);font-size:10.5px;margin-top:1px}
+
+  .inspector{background:#fff3e8;border:2px solid #ffd9b8;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:9px}
+  .inspector .row{display:flex;align-items:center;gap:8px}
+  .inspector .row label{width:16px;font-size:11px;font-weight:800;color:var(--accent-dark)}
+  .inspector input[type=range]{flex:1; accent-color:var(--accent)}
+  .inspector .val{width:34px;text-align:right;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+  .inspector .title{display:flex;justify-content:space-between;align-items:center}
+  .inspector .title b{font:800 13px 'Baloo 2',sans-serif}
+
+  .hr{height:1px;background:var(--panel-line);border:none;margin:0}
+
+  .submit-box{background:#eefaf1;border:2px solid #cdeed9;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px}
+  .submit-box p{margin:0;font-size:11.5px;color:var(--ink-soft);font-weight:600;line-height:1.4}
+  .submit-status{font-size:11.5px;font-weight:700;min-height:15px}
+  .submit-status.ok{color:var(--good-dark)}
+  .submit-status.err{color:var(--bad-dark)}
+  .submit-status.pending{color:var(--info-dark)}
+
+  .export-box{display:none;flex-direction:column;gap:8px}
+  .export-box.show{display:flex}
+  .export-box textarea{
+    width:100%;height:110px;font:11px/1.4 ui-monospace,Menlo,monospace;padding:8px;border-radius:10px;
+    border:2px solid var(--chip-line);background:#fbfbf6;color:#333;resize:vertical;
+  }
+  .copied-msg{font-size:11px;font-weight:700;color:var(--good-dark);display:none}
+  .copied-msg.show{display:block}
+  .fallback-toggle{
+    background:none; border:none; text-decoration:underline; color:var(--ink-soft); font:700 11px 'Inter',sans-serif;
+    cursor:pointer; padding:0; text-align:left;
+  }
+
+  /* ---- stage ---- */
+  .stage{flex:1;position:relative;border-radius:20px;overflow:hidden;border:3px solid #fff;box-shadow:0 10px 24px #17335522;background:#7fc2ef}
+  canvas{display:block;width:100%;height:100%}
+  .hud{position:absolute;left:14px;top:14px;right:14px;display:flex;justify-content:space-between;gap:10px;pointer-events:none}
+  .pill{
+    background:#0b1e33cc;color:#fff;font:700 11.5px 'Inter',sans-serif;padding:7px 12px;border-radius:100px;
+    backdrop-filter:blur(2px);
+  }
+  .pill.hide{display:none}
+  .helpbtn{pointer-events:auto;cursor:pointer;border:none}
+  .stagebottom{position:absolute;left:14px;right:14px;bottom:14px;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;pointer-events:none}
+  .badge-count{background:#fffaf0ee;color:var(--ink);font:800 12px 'Baloo 2',sans-serif;padding:6px 12px;border-radius:100px;border:2px solid #fff;box-shadow:0 3px 0 #0002}
+  .empty-note{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;
+    color:#0b2038;background:#fffaf0dd;padding:14px 18px;border-radius:16px;font:700 13px 'Inter',sans-serif;
+    box-shadow:0 6px 16px #0002; max-width:260px; display:none;
+  }
+  .empty-note.show{display:block}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="panel" id="panel">
+    <a href="index.html" class="back-link">&larr; Back to Egg Assault</a>
+
+    <div class="brand">
+      <div class="brand-badge"></div>
+      <div>
+        <h1>Map Studio</h1>
+        <p>build a level for Egg Assault</p>
+      </div>
+    </div>
+
+    <div class="tip" id="tip">
+      <button type="button" class="tip-close" id="tipClose" aria-label="Dismiss">&times;</button>
+      <b>How this works:</b> pick a piece (or a ready-made structure) below, then click anywhere on the ground to drop it. Click a piece already on the ground to move, resize or delete it. When you're happy, hit <b>Submit for approval</b> at the bottom &mdash; Amy reviews every map before it goes live.
+    </div>
+
+    <div class="field">
+      <label for="mapName">Map name</label>
+      <input type="text" id="mapName" maxlength="24" placeholder="My Map">
+    </div>
+    <div class="field">
+      <label for="mapTag">Short tagline</label>
+      <input type="text" id="mapTag" maxlength="34" placeholder="A custom arena">
+    </div>
+    <div class="field">
+      <label for="submitterName">Your name</label>
+      <input type="text" id="submitterName" maxlength="24" placeholder="How should Amy know it's yours?">
+    </div>
+
+    <div>
+      <p class="section-title" style="margin-bottom:6px">Sky &amp; theme</p>
+      <div class="theme-row" id="themeRow"></div>
+    </div>
+
+    <hr class="hr">
+
+    <div>
+      <div class="tab-row" style="margin-bottom:8px">
+        <button type="button" class="tab-btn sel" id="tabPieces">Pieces</button>
+        <button type="button" class="tab-btn" id="tabPrefabs">Ready-made</button>
+      </div>
+      <div class="tool-grid" id="toolGrid"></div>
+      <div class="prefab-list" id="prefabList" hidden></div>
+    </div>
+
+    <div id="inspector" class="inspector" style="display:none"></div>
+
+    <hr class="hr">
+
+    <div>
+      <p class="section-title" style="margin-bottom:6px">Start over with a layout</p>
+      <div class="templates" id="templateList"></div>
+    </div>
+
+    <button class="btn btn-ghost" id="clearBtn" type="button">Clear map</button>
+
+    <hr class="hr">
+
+    <div class="submit-box">
+      <p><b style="color:var(--ink)">Send this to Amy.</b> She reviews every submitted map, and approved ones show up as real, playable maps in Egg Assault.</p>
+      <button class="btn btn-good" id="submitBtn" type="button">Submit for approval</button>
+      <div class="submit-status" id="submitStatus"></div>
+      <button type="button" class="fallback-toggle" id="fallbackToggle">Submitting not working? Get map code instead</button>
+    </div>
+
+    <div class="export-box" id="exportBox">
+      <p style="margin:0;font-size:11.5px;color:var(--ink-soft);font-weight:600">
+        Copy this and paste it in your chat with Claude, or send it to Amy directly.
+      </p>
+      <textarea id="exportText" readonly onclick="this.select()"></textarea>
+      <button class="btn btn-info" id="copyBtn" type="button">Copy to clipboard</button>
+      <p class="copied-msg" id="copiedMsg">Copied!</p>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage">
+    <canvas id="c"></canvas>
+    <div class="hud">
+      <div class="pill" id="modePill">Click the ground to look around</div>
+      <button class="pill helpbtn" id="helpBtn" type="button">?</button>
+    </div>
+    <div class="stagebottom">
+      <div class="badge-count" id="countBadge">0 pieces</div>
+      <div class="pill" id="camHint">drag&nbsp;=&nbsp;orbit &nbsp;•&nbsp; scroll&nbsp;=&nbsp;zoom &nbsp;•&nbsp; right-drag&nbsp;=&nbsp;pan</div>
+    </div>
+    <div class="empty-note" id="emptyNote">Pick a shape on the left, then click anywhere on the ground to place it.</div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+var SERVER_URL = 'https://egg-assault-server.onrender.com';
+
+/* ============ themes (same shape the game's map defs use) ============ */
+var THEMES = [
+  {id:'sunnyyard', label:'Sunny Yard', sky:['#4fb2f2','#9ad8fb','#eef9ff'], fog:'#bfe3fb', bg:'#8fd3fb',
+   floor:'#b7c0c9', floorLine:'rgba(30,35,45,.28)', wall:'#f0d59a', wallStripe:'#e5543f', wallDark:'#cdab6c',
+   crate:'#d69248', pillar:'#f4f7fa', ambient:['#ffffff','#93a8bd'], sun:'#fff3d6'},
+  {id:'farmyard', label:'Farmyard', sky:['#cdeeff','#e4f4ff','#fff8dd'], fog:'#d8eeff', bg:'#c7e6f7',
+   floor:'#dcc790', floorLine:'rgba(120,90,40,.25)', wall:'#f5f2e8', wallStripe:'#e5543f', wallDark:'#cfcfc2',
+   crate:'#bd8348', pillar:'#f6f1e2', ambient:['#fff6da','#a4915f'], sun:'#ffffff'},
+  {id:'neon', label:'Neon Night', sky:['#33144d','#63248f','#9a4bcf'], fog:'#431b70', bg:'#33144d',
+   floor:'#33204c', floorLine:'rgba(255,80,230,.3)', wall:'#412563', wallStripe:'#38f6ff', wallDark:'#211136',
+   crate:'#5c2f80', pillar:'#53307d', ambient:['#dd97ff','#33144d'], sun:'#d39bff'},
+  {id:'desert', label:'Desert Dusk', sky:['#ff8a5c','#ffb37a','#ffe3b0'], fog:'#ffb37a', bg:'#ff9c6b',
+   floor:'#d9a45f', floorLine:'rgba(60,30,10,.25)', wall:'#f0c58a', wallStripe:'#8a3b2b', wallDark:'#b98a4e',
+   crate:'#c17a3d', pillar:'#f0d3a0', ambient:['#ffddb0','#8a5230'], sun:'#ffe0a0'},
+  {id:'frost', label:'Frostbite', sky:['#7fc3e8','#bfe4f5','#eefaff'], fog:'#bfe4f5', bg:'#9ed3ec',
+   floor:'#c9e4ef', floorLine:'rgba(20,50,70,.22)', wall:'#e7f4fa', wallStripe:'#2f7fb0', wallDark:'#b7d6e3',
+   crate:'#6fa8c9', pillar:'#eaf6fb', ambient:['#ffffff','#7fa8c0'], sun:'#f0fbff'}
+];
+function themeById(id){ for(var i=0;i<THEMES.length;i++) if(THEMES[i].id===id) return THEMES[i]; return THEMES[0]; }
+
+var TOOLS = [
+  {type:'wall',    label:'Wall',     shape:'sh-wall',     w:6,  d:1,  h:4},
+  {type:'crate',   label:'Crate',    shape:'sh-crate',    w:2,  d:2,  h:2},
+  {type:'pillar',  label:'Pillar',   shape:'sh-pillar',   w:1.6,d:1.6,h:5},
+  {type:'platform',label:'Platform', shape:'sh-platform', w:8,  d:8,  h:2.6},
+  {type:'ramp',    label:'Ramp',     shape:'sh-ramp',     w:2.6,d:4,  h:2.6}
+];
+function toolDef(type){ for(var i=0;i<TOOLS.length;i++) if(TOOLS[i].type===type) return TOOLS[i]; return TOOLS[0]; }
+
+/* ---- ready-made multi-piece structures. Positions are relative to
+   wherever the player clicks (that click becomes 0,0). Every piece
+   dropped this way stays a normal, separately-editable object
+   afterward, so nothing here is "special" once it's placed. ---- */
+var PREFABS = [
+  {id:'tower', label:'Watchtower', emoji:'🗼', note:'A raised platform with a ramp up', objects:[
+    {type:'platform', x:0, z:0, w:6, d:6, h:7, rot:0},
+    {type:'ramp', x:0, z:6.5, w:2.6, d:9, h:7, rot:180}
+  ]},
+  {id:'bunker', label:'Bunker', emoji:'🛡️', note:'Three walls with an open side', objects:[
+    {type:'wall', x:-3.5, z:0, w:1, d:8, h:3, rot:0},
+    {type:'wall', x:3.5, z:0, w:1, d:8, h:3, rot:0},
+    {type:'wall', x:0, z:-4, w:8, d:1, h:3, rot:0},
+    {type:'crate', x:0, z:2.5, w:2, d:2, h:2, rot:0}
+  ]},
+  {id:'cratepile', label:'Crate Pile', emoji:'📦', note:'Staggered cover, quick to drop', objects:[
+    {type:'crate', x:-2.2, z:0, w:2, d:2, h:2, rot:8},
+    {type:'crate', x:2, z:1, w:2, d:2, h:2, rot:-6},
+    {type:'crate', x:0, z:-2.4, w:3, d:2, h:2, rot:15}
+  ]},
+  {id:'snipernest', label:'Sniper Nest', emoji:'🎯', note:'Tall deck with a long ramp up', objects:[
+    {type:'platform', x:0, z:0, w:4, d:4, h:9, rot:0},
+    {type:'ramp', x:0, z:7.2, w:2.6, d:11, h:9, rot:180}
+  ]},
+  {id:'bridge', label:'Bridge', emoji:'🌉', note:'A raised walkway on two posts', objects:[
+    {type:'pillar', x:-6, z:0, w:1.6, d:1.6, h:4, rot:0},
+    {type:'pillar', x:6, z:0, w:1.6, d:1.6, h:4, rot:0},
+    {type:'platform', x:0, z:0, w:14, d:3, h:4, rot:0}
+  ]},
+  {id:'zigzag', label:'Zigzag Corner', emoji:'🚧', note:'A staggered wall for close-range fights', objects:[
+    {type:'wall', x:-4, z:0, w:1, d:8, h:4, rot:0},
+    {type:'wall', x:0, z:4, w:8, d:1, h:4, rot:0},
+    {type:'wall', x:4, z:8, w:1, d:8, h:4, rot:0}
+  ]},
+  {id:'pillarring', label:'Pillar Ring', emoji:'⭐', note:'Four lit pillars around a center crate', objects:[
+    {type:'pillar', x:-4, z:-4, w:1.6, d:1.6, h:5, rot:0},
+    {type:'pillar', x:4, z:-4, w:1.6, d:1.6, h:5, rot:0},
+    {type:'pillar', x:-4, z:4, w:1.6, d:1.6, h:5, rot:0},
+    {type:'pillar', x:4, z:4, w:1.6, d:1.6, h:5, rot:0},
+    {type:'crate', x:0, z:0, w:2, d:2, h:2, rot:0}
+  ]},
+  {id:'barricade', label:'Barricade Row', emoji:'🚨', note:'A defensive line of angled crates', objects:[
+    {type:'crate', x:-4, z:0, w:2, d:2, h:2, rot:10},
+    {type:'crate', x:0, z:0, w:2, d:2, h:2, rot:0},
+    {type:'crate', x:4, z:0, w:2, d:2, h:2, rot:-10}
+  ]}
+];
+function prefabById(id){ for(var i=0;i<PREFABS.length;i++) if(PREFABS[i].id===id) return PREFABS[i]; return null; }
+
+var TEMPLATES = {
+  openfield: {label:'Open Field', note:'A few crates to hide behind', objects:[
+    {type:'crate',x:8,z:6,w:3,d:3,h:2,rot:0},{type:'crate',x:-9,z:5,w:2,d:4,h:2,rot:0},
+    {type:'crate',x:0,z:-10,w:5,d:2,h:2,rot:0},{type:'pillar',x:-16,z:-14,w:1.6,h:5,d:1.6,rot:0},
+    {type:'pillar',x:16,z:-14,w:1.6,h:5,d:1.6,rot:0}
+  ]},
+  fortress: {label:'Fortress', note:'A walled keep with a lookout deck', objects:[
+    {type:'wall',x:0,z:-16,w:22,h:4,d:1,rot:0},{type:'wall',x:0,z:16,w:22,h:4,d:1,rot:0},
+    {type:'wall',x:-16,z:0,w:1,h:4,d:22,rot:0},{type:'wall',x:16,z:0,w:1,h:4,d:22,rot:0},
+    {type:'platform',x:0,z:0,w:10,d:10,h:2.6,rot:0},
+    {type:'ramp',x:0,z:7,w:2.6,h:2.6,d:4,rot:180},
+    {type:'pillar',x:-16,z:-16,w:1.8,h:5.5,d:1.8,rot:0},{type:'pillar',x:16,z:-16,w:1.8,h:5.5,d:1.8,rot:0},
+    {type:'pillar',x:-16,z:16,w:1.8,h:5.5,d:1.8,rot:0},{type:'pillar',x:16,z:16,w:1.8,h:5.5,d:1.8,rot:0}
+  ]},
+  maze: {label:'Maze Run', note:'Tight corridors for close fights', objects:[
+    {type:'wall',x:-14,z:-20,w:1,h:4,d:20,rot:0},{type:'wall',x:-14,z:10,w:1,h:4,d:20,rot:0},
+    {type:'wall',x:0,z:-6,w:1,h:4,d:28,rot:0},{type:'wall',x:14,z:-20,w:1,h:4,d:20,rot:0},
+    {type:'wall',x:14,z:16,w:1,h:4,d:16,rot:0},{type:'wall',x:-7,z:-24,w:14,h:4,d:1,rot:0},
+    {type:'wall',x:7,z:20,w:14,h:4,d:1,rot:0},{type:'crate',x:-7,z:0,w:2,d:2,h:2,rot:0},
+    {type:'crate',x:7,z:2,w:2,d:2,h:2,rot:0}
+  ]}
+};
+
+/* ============ state ============ */
+var nextId = 1;
+function freshObjects(list){
+  return list.map(function(o){ return Object.assign({id:nextId++}, o); });
+}
+function cachedName(){
+  try{ return localStorage.getItem('eggMapStudio_name') || ''; }catch(e){ return ''; }
+}
+function defaultState(){
+  return {
+    name:'My Map', tag:'A custom arena', theme:'sunnyyard', submitter:cachedName(),
+    objects: freshObjects(TEMPLATES.openfield.objects)
+  };
+}
+var state = null;
+function loadState(){
+  try{
+    var raw = localStorage.getItem('eggMapStudio_v2');
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return null;
+}
+function persist(){
+  try{
+    var maxId = 0;
+    state.objects.forEach(function(o){ if(o.id>maxId) maxId=o.id; });
+    nextId = Math.max(nextId, maxId+1);
+    localStorage.setItem('eggMapStudio_v2', JSON.stringify(state));
+    if(state.submitter) localStorage.setItem('eggMapStudio_name', state.submitter);
+  }catch(e){}
+}
+
+function boot(){
+  state = loadState() || defaultState();
+  if(state.submitter==null) state.submitter = cachedName();
+  if(!state.objects || !state.objects.length) state.objects = freshObjects(TEMPLATES.openfield.objects);
+  var maxId = 0;
+  state.objects.forEach(function(o){ if(o.id>maxId) maxId=o.id; });
+  nextId = maxId+1;
+  startApp();
+}
+boot();
+
+/* ============ app ============ */
+function startApp(){
+  var mapNameEl = document.getElementById('mapName');
+  var mapTagEl = document.getElementById('mapTag');
+  var submitterEl = document.getElementById('submitterName');
+  mapNameEl.value = state.name;
+  mapTagEl.value = state.tag;
+  submitterEl.value = state.submitter || '';
+  mapNameEl.addEventListener('input', function(){ state.name = mapNameEl.value; persist(); });
+  mapTagEl.addEventListener('input', function(){ state.tag = mapTagEl.value; persist(); });
+  submitterEl.addEventListener('input', function(){ state.submitter = submitterEl.value; persist(); });
+
+  /* ---- onboarding tip ---- */
+  var tip = document.getElementById('tip');
+  var tipSeen = false;
+  try{ tipSeen = localStorage.getItem('eggMapStudio_tipSeen')==='1'; }catch(e){}
+  if(!tipSeen) tip.classList.add('show');
+  document.getElementById('tipClose').addEventListener('click', function(){
+    tip.classList.remove('show');
+    try{ localStorage.setItem('eggMapStudio_tipSeen','1'); }catch(e){}
+  });
+
+  /* ---- theme swatches ---- */
+  var themeRow = document.getElementById('themeRow');
+  THEMES.forEach(function(t){
+    var b = document.createElement('button');
+    b.type='button'; b.className='theme-swatch'+(t.id===state.theme?' sel':'');
+    b.style.background = 'linear-gradient(160deg,'+t.sky[0]+','+t.sky[1]+' 55%,'+t.sky[2]+')';
+    b.title = t.label;
+    b.addEventListener('click', function(){
+      state.theme = t.id; persist();
+      Array.prototype.forEach.call(themeRow.children,function(c){c.classList.remove('sel')});
+      b.classList.add('sel');
+      applyTheme();
+    });
+    themeRow.appendChild(b);
+  });
+
+  /* ---- armed placement state: either a single tool or a prefab stamp ---- */
+  var armed = null; // {kind:'tool', type:'wall'} | {kind:'prefab', id:'tower'} | null
+
+  /* ---- tool palette ---- */
+  var toolGrid = document.getElementById('toolGrid');
+  var toolButtons = {};
+  TOOLS.forEach(function(t){
+    var b = document.createElement('button');
+    b.type='button'; b.className='tool-btn';
+    b.innerHTML = '<span class="swatch-shape"><span class="'+t.shape+'"></span></span><span>'+t.label+'</span>';
+    b.addEventListener('click', function(){
+      armed = (armed && armed.kind==='tool' && armed.type===t.type) ? null : {kind:'tool', type:t.type};
+      selectObj(null);
+      refreshArmedUI();
+    });
+    toolGrid.appendChild(b);
+    toolButtons[t.type]=b;
+  });
+
+  /* ---- prefab palette ---- */
+  var prefabList = document.getElementById('prefabList');
+  var prefabButtons = {};
+  PREFABS.forEach(function(p){
+    var b = document.createElement('button');
+    b.type='button'; b.className='prefab-btn';
+    b.innerHTML = '<span class="emoji">'+p.emoji+'</span><span><span>'+p.label+'</span><small>'+p.note+'</small></span>';
+    b.addEventListener('click', function(){
+      armed = (armed && armed.kind==='prefab' && armed.id===p.id) ? null : {kind:'prefab', id:p.id};
+      selectObj(null);
+      refreshArmedUI();
+    });
+    prefabList.appendChild(b);
+    prefabButtons[p.id]=b;
+  });
+
+  /* ---- tabs ---- */
+  var tabPieces = document.getElementById('tabPieces');
+  var tabPrefabs = document.getElementById('tabPrefabs');
+  function showTab(which){
+    tabPieces.classList.toggle('sel', which==='pieces');
+    tabPrefabs.classList.toggle('sel', which==='prefabs');
+    toolGrid.hidden = which!=='pieces';
+    prefabList.hidden = which!=='prefabs';
+  }
+  tabPieces.addEventListener('click', function(){ showTab('pieces'); });
+  tabPrefabs.addEventListener('click', function(){ showTab('prefabs'); });
+  showTab('pieces');
+
+  function refreshArmedUI(){
+    Object.keys(toolButtons).forEach(function(k){ toolButtons[k].classList.toggle('armed', !!(armed && armed.kind==='tool' && armed.type===k)); });
+    Object.keys(prefabButtons).forEach(function(k){ prefabButtons[k].classList.toggle('armed', !!(armed && armed.kind==='prefab' && armed.id===k)); });
+    var pill = document.getElementById('modePill');
+    if(!armed){ pill.textContent = 'Click a piece to select it'; return; }
+    if(armed.kind==='tool'){ pill.textContent = 'Click the ground to place a '+toolDef(armed.type).label.toLowerCase(); }
+    else { pill.textContent = 'Click the ground to place a '+prefabById(armed.id).label.toLowerCase(); }
+  }
+  refreshArmedUI();
+
+  /* ---- templates (replace whole map) ---- */
+  var tplList = document.getElementById('templateList');
+  Object.keys(TEMPLATES).forEach(function(key){
+    var t = TEMPLATES[key];
+    var b = document.createElement('button');
+    b.type='button'; b.className='tpl-btn';
+    b.innerHTML = t.label+'<small>'+t.note+'</small>';
+    b.addEventListener('click', function(){
+      if(state.objects.length && !confirm('Replace your current map with "'+t.label+'"? This can\'t be undone.')) return;
+      state.objects = freshObjects(t.objects);
+      selectObj(null); rebuildObjects(); persist(); refreshCount();
+    });
+    tplList.appendChild(b);
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', function(){
+    if(!state.objects.length) return;
+    if(!confirm('Clear every piece from the map?')) return;
+    state.objects = []; selectObj(null); rebuildObjects(); persist(); refreshCount();
+  });
+
+  var helpOn = true;
+  document.getElementById('helpBtn').addEventListener('click', function(){
+    helpOn = !helpOn;
+    document.getElementById('camHint').classList.toggle('hide', !helpOn);
+  });
+
+  /* ---- export payload (shared by submit + copy fallback) ---- */
+  function buildPayload(){
+    var t = themeById(state.theme);
+    return {
+      name: (state.name||'My Map').trim() || 'My Map',
+      tag: (state.tag||'A custom arena').trim() || 'A custom arena',
+      submitter: (state.submitter||'').trim() || 'Anonymous',
+      theme: t.id,
+      colors: {
+        sky: t.sky, fog: t.fog, bg: t.bg, floor: t.floor, floorLine: t.floorLine,
+        wall: t.wall, wallStripe: t.wallStripe, wallDark: t.wallDark,
+        crate: t.crate, pillar: t.pillar, ambient: t.ambient, sun: t.sun
+      },
+      objects: state.objects.map(function(o){
+        return {type:o.type, x:round1(o.x), z:round1(o.z), w:round1(o.w), d:round1(o.d), h:round1(o.h), rot:o.rot||0};
+      })
+    };
+  }
+  function round1(n){ return Math.round(n*10)/10; }
+
+  /* ---- submit to server ---- */
+  var submitBtn = document.getElementById('submitBtn');
+  var submitStatus = document.getElementById('submitStatus');
+  var submitting = false;
+  submitBtn.addEventListener('click', function(){
+    if(submitting) return;
+    if(!state.objects.length){
+      submitStatus.className = 'submit-status err';
+      submitStatus.textContent = "Add at least one piece before submitting.";
+      return;
+    }
+    submitting = true;
+    submitBtn.disabled = true;
+    submitStatus.className = 'submit-status pending';
+    submitStatus.textContent = 'Sending your map to Amy…';
+
+    fetch(SERVER_URL + '/submit-map', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(buildPayload())
+    }).then(function(r){
+      return r.json().then(function(data){ return {ok:r.ok, data:data}; });
+    }).then(function(res){
+      submitting = false;
+      submitBtn.disabled = false;
+      if(res.ok && res.data && res.data.ok){
+        submitStatus.className = 'submit-status ok';
+        submitStatus.textContent = "Sent! Amy will take a look and approve it if it's a good fit.";
+      } else {
+        submitStatus.className = 'submit-status err';
+        submitStatus.textContent = (res.data && res.data.error) || "That didn't go through. Try the map code option below.";
+      }
+    }).catch(function(){
+      submitting = false;
+      submitBtn.disabled = false;
+      submitStatus.className = 'submit-status err';
+      submitStatus.textContent = "Couldn't reach the server (it may be waking up — try again in a few seconds), or use the map code option below.";
+    });
+  });
+
+  document.getElementById('fallbackToggle').addEventListener('click', function(){
+    var box = document.getElementById('exportBox');
+    var showing = box.classList.toggle('show');
+    if(showing) document.getElementById('exportText').value = JSON.stringify(Object.assign({eggAssaultMap:1}, buildPayload()), null, 2);
+  });
+  document.getElementById('copyBtn').addEventListener('click', function(){
+    var ta = document.getElementById('exportText');
+    ta.select();
+    var ok=false;
+    try{ ok = document.execCommand && document.execCommand('copy'); }catch(e){}
+    function done(){
+      var msg=document.getElementById('copiedMsg');
+      msg.classList.add('show'); setTimeout(function(){msg.classList.remove('show')},2200);
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(ta.value).then(done).catch(function(){ if(ok) done(); });
+    } else if(ok){ done(); }
+  });
+
+  /* ================= three.js scene ================= */
+  var stage = document.getElementById('stage');
+  var canvas = document.getElementById('c');
+  var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true});
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(55, 1, 0.1, 500);
+
+  var hemi = new THREE.HemisphereLight(0xffffff,0x888888,0.55);
+  scene.add(hemi);
+  var sun = new THREE.DirectionalLight(0xffffff,0.5);
+  sun.position.set(30,40,20);
+  scene.add(sun);
+
+  var groundMat = new THREE.MeshLambertMaterial({color:0xb7c0c9});
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(116,116), groundMat);
+  ground.rotation.x=-Math.PI/2;
+  scene.add(ground);
+
+  var grid = new THREE.GridHelper(116,58,0xffffff,0xffffff);
+  grid.material.opacity=0.18; grid.material.transparent=true; grid.position.y=0.02;
+  scene.add(grid);
+
+  var boundaryMat = new THREE.MeshBasicMaterial({color:0x0b2038, transparent:true, opacity:0.16});
+  var boundaryGroup = new THREE.Group();
+  function bwall(x,z,w,d){
+    var m=new THREE.Mesh(new THREE.BoxGeometry(w,5,d), boundaryMat);
+    m.position.set(x,2.5,z); boundaryGroup.add(m);
+  }
+  bwall(0,-58,118,1); bwall(0,58,118,1); bwall(-58,0,1,116); bwall(58,0,1,116);
+  scene.add(boundaryGroup);
+
+  var spawnMarker = new THREE.Group();
+  var spawnPole = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,2.4,8), new THREE.MeshBasicMaterial({color:0x1c2340}));
+  spawnPole.position.y=1.2; spawnMarker.add(spawnPole);
+  var spawnFlag = new THREE.Mesh(new THREE.ConeGeometry(0.55,0.9,4), new THREE.MeshBasicMaterial({color:0x62d391}));
+  spawnFlag.position.set(0.4,2.1,0); spawnFlag.rotation.y=Math.PI/4; spawnMarker.add(spawnFlag);
+  spawnMarker.position.set(0,0,14);
+  scene.add(spawnMarker);
+
+  function ringGeo(r){
+    var pts=[]; for(var i=0;i<=64;i++){ var a=i/64*Math.PI*2; pts.push(new THREE.Vector3(Math.cos(a)*r,0.03,Math.sin(a)*r)); }
+    return new THREE.BufferGeometry().setFromPoints(pts);
+  }
+  var spawnRingMat = new THREE.LineDashedMaterial({color:0xf2564a, dashSize:1.2, gapSize:0.8, transparent:true, opacity:0.55});
+  var ringInner = new THREE.Line(ringGeo(22), spawnRingMat); ringInner.computeLineDistances(); scene.add(ringInner);
+  var ringOuter = new THREE.Line(ringGeo(48), spawnRingMat); ringOuter.computeLineDistances(); scene.add(ringOuter);
+
+  var objectsGroup = new THREE.Group();
+  scene.add(objectsGroup);
+  var meshes = {};
+
+  var selBox = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),
+    new THREE.LineBasicMaterial({color:0xff8c4d, linewidth:2})
+  );
+  selBox.visible=false;
+  scene.add(selBox);
+
+  function hexNum(h){ return parseInt(h.replace('#',''),16); }
+
+  function meshForObj(o, theme){
+    var color, geo, mesh;
+    if(o.type==='wall'){
+      geo = new THREE.BoxGeometry(o.w,o.h,o.d);
+      mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:hexNum(theme.wall)}));
+      mesh.position.set(o.x, o.h/2, o.z);
+    } else if(o.type==='crate'){
+      geo = new THREE.BoxGeometry(o.w,o.h,o.d);
+      mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:hexNum(theme.crate)}));
+      mesh.position.set(o.x, o.h/2, o.z);
+    } else if(o.type==='pillar'){
+      geo = new THREE.BoxGeometry(o.w,o.h,o.d);
+      mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:hexNum(theme.pillar)}));
+      mesh.position.set(o.x, o.h/2, o.z);
+      var bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16,8,8), new THREE.MeshBasicMaterial({color:0xffd35a}));
+      bulb.position.set(0,o.h/2+0.2,0);
+      mesh.add(bulb);
+    } else if(o.type==='platform'){
+      mesh = new THREE.Group();
+      var post = new THREE.Mesh(new THREE.BoxGeometry(1.7,o.h,1.7), new THREE.MeshLambertMaterial({color:hexNum(theme.pillar)}));
+      post.position.set(0,o.h/2,0); mesh.add(post);
+      var top = new THREE.Mesh(new THREE.BoxGeometry(o.w,0.3,o.d), new THREE.MeshLambertMaterial({color:hexNum(theme.pillar)}));
+      top.position.set(0,o.h-0.14,0); mesh.add(top);
+      mesh.position.set(o.x,0,o.z);
+    } else if(o.type==='ramp'){
+      geo = new THREE.BoxGeometry(o.w, 0.3, Math.sqrt(o.d*o.d+o.h*o.h));
+      mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:hexNum(theme.crate)}));
+      mesh.rotation.x = -Math.atan2(o.h,o.d);
+      mesh.position.set(o.x, o.h/2, o.z);
+    }
+    mesh.rotation.y = (o.rot||0)*Math.PI/180;
+    mesh.userData.id = o.id;
+    mesh.castShadow=false;
+    return mesh;
+  }
+
+  function rebuildObjects(){
+    Object.keys(meshes).forEach(function(id){ objectsGroup.remove(meshes[id]); });
+    meshes = {};
+    var theme = themeById(state.theme);
+    state.objects.forEach(function(o){
+      var m = meshForObj(o, theme);
+      objectsGroup.add(m);
+      meshes[o.id]=m;
+    });
+    document.getElementById('emptyNote').classList.toggle('show', state.objects.length===0 && !armed);
+  }
+
+  function applyTheme(){
+    var t = themeById(state.theme);
+    scene.background = new THREE.Color(t.bg);
+    scene.fog = new THREE.Fog(hexNum(t.fog), 55, 165);
+    groundMat.color.set(t.floor);
+    hemi.color.set(t.ambient[0]); hemi.groundColor.set(t.ambient[1]);
+    sun.color.set(t.sun);
+    document.getElementById('stage').style.background = t.bg;
+    rebuildObjects();
+  }
+
+  /* ---- camera orbit / pan / zoom ---- */
+  var camTarget = new THREE.Vector3(0,0,0);
+  var camAngleY = 0.7, camAngleX = 0.62, camDist = 78;
+  function updateCamera(){
+    camAngleX = Math.max(0.18, Math.min(1.35, camAngleX));
+    camDist = Math.max(18, Math.min(150, camDist));
+    var x = camTarget.x + camDist*Math.sin(camAngleY)*Math.cos(camAngleX);
+    var y = camTarget.y + camDist*Math.sin(camAngleX);
+    var z = camTarget.z + camDist*Math.cos(camAngleY)*Math.cos(camAngleX);
+    camera.position.set(x,y,z);
+    camera.lookAt(camTarget);
+  }
+  updateCamera();
+
+  function resize(){
+    var w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w,h,false);
+    camera.aspect = w/Math.max(1,h);
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ---- selection & inspector ---- */
+  var selectedId = null;
+  function selectedObj(){ for(var i=0;i<state.objects.length;i++) if(state.objects[i].id===selectedId) return state.objects[i]; return null; }
+  function selectObj(id){
+    selectedId = id;
+    var o = selectedObj();
+    selBox.visible = !!o;
+    if(o){
+      var m = meshes[o.id];
+      var box = new THREE.Box3().setFromObject(m);
+      var size = new THREE.Vector3(); box.getSize(size);
+      var center = new THREE.Vector3(); box.getCenter(center);
+      selBox.geometry.dispose();
+      selBox.geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(size.x+0.15,size.y+0.15,size.z+0.15));
+      selBox.position.copy(center);
+    }
+    renderInspector();
+  }
+
+  function renderInspector(){
+    var panel = document.getElementById('inspector');
+    var o = selectedObj();
+    if(!o){ panel.style.display='none'; panel.innerHTML=''; return; }
+    panel.style.display='flex';
+    var def = toolDef(o.type);
+    var ranges = {
+      wall:{w:[2,30,.5],d:[.5,4,.5],h:[2,8,.5]},
+      crate:{w:[1,8,.5],d:[1,8,.5],h:[1,8,.5]},
+      pillar:{w:[1,3,.2],d:[1,3,.2],h:[2,9,.5]},
+      platform:{w:[3,20,.5],d:[3,20,.5],h:[1,7,.5]},
+      ramp:{w:[1.5,8,.5],d:[2,14,.5],h:[1,7,.5]}
+    }[o.type];
+    panel.innerHTML =
+      '<div class="title"><b>'+def.label+'</b><span style="font-size:11px;color:var(--ink-soft)">#'+o.id+'</span></div>'+
+      row('W', 'w', ranges.w) + row('D', 'd', ranges.d) + row('H', 'h', ranges.h);
+    function row(label,key,r){
+      return '<div class="row"><label>'+label+'</label><input type="range" data-key="'+key+'" min="'+r[0]+'" max="'+r[1]+'" step="'+r[2]+'" value="'+o[key]+'"><span class="val" data-valfor="'+key+'">'+o[key]+'</span></div>';
+    }
+    Array.prototype.forEach.call(panel.querySelectorAll('input[type=range]'), function(inp){
+      inp.addEventListener('input', function(){
+        var k = inp.dataset.key;
+        o[k] = parseFloat(inp.value);
+        panel.querySelector('[data-valfor="'+k+'"]').textContent = o[k];
+        rebuildObjects(); selectObj(o.id); persist();
+      });
+    });
+    var btnRow = document.createElement('div');
+    btnRow.className='btn-row';
+    btnRow.innerHTML =
+      '<button type="button" class="btn btn-ghost" id="rotBtn" style="box-shadow:0 3px 0 var(--chip-line)">Rotate 90&deg;</button>'+
+      '<button type="button" class="btn btn-ghost" id="dupBtn">Duplicate</button>';
+    panel.appendChild(btnRow);
+    var delBtn = document.createElement('button');
+    delBtn.type='button'; delBtn.className='btn btn-bad'; delBtn.style.marginTop='8px';
+    delBtn.textContent='Delete piece';
+    panel.appendChild(delBtn);
+
+    document.getElementById('rotBtn').addEventListener('click', function(){
+      o.rot = ((o.rot||0)+90)%360; rebuildObjects(); selectObj(o.id); persist();
+    });
+    document.getElementById('dupBtn').addEventListener('click', function(){
+      var copy = Object.assign({}, o, {id:nextId++, x:o.x+2, z:o.z+2});
+      state.objects.push(copy); rebuildObjects(); selectObj(copy.id); persist(); refreshCount();
+    });
+    delBtn.addEventListener('click', function(){
+      state.objects = state.objects.filter(function(it){ return it.id!==o.id; });
+      selectObj(null); rebuildObjects(); persist(); refreshCount();
+    });
+  }
+
+  function refreshCount(){
+    var n = state.objects.length;
+    document.getElementById('countBadge').textContent = n+(n===1?' piece':' pieces');
+    document.getElementById('emptyNote').classList.toggle('show', n===0 && !armed);
+  }
+
+  /* ---- pointer interaction ---- */
+  var raycaster = new THREE.Raycaster();
+  var groundPlane = new THREE.Plane(new THREE.Vector3(0,1,0),0);
+  var ndc = new THREE.Vector2();
+  function setNdc(e){
+    var r = canvas.getBoundingClientRect();
+    ndc.x = ((e.clientX-r.left)/r.width)*2-1;
+    ndc.y = -((e.clientY-r.top)/r.height)*2+1;
+  }
+  function groundHit(e){
+    setNdc(e); raycaster.setFromCamera(ndc,camera);
+    var pt = new THREE.Vector3();
+    raycaster.ray.intersectPlane(groundPlane, pt);
+    return pt;
+  }
+  function pickObject(e){
+    setNdc(e); raycaster.setFromCamera(ndc,camera);
+    var list = objectsGroup.children;
+    var hits = raycaster.intersectObjects(list, true);
+    if(!hits.length) return null;
+    var obj = hits[0].object;
+    while(obj && obj.userData.id==null) obj = obj.parent;
+    return obj ? obj.userData.id : null;
+  }
+  function snap(n){ return Math.round(n/1)*1; }
+  function clampCoord(n){ return Math.max(-50, Math.min(50, n)); }
+
+  var mode = null; // 'orbit' | 'pan' | 'drag'
+  var last = {x:0,y:0};
+  var moved = false;
+
+  canvas.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  canvas.addEventListener('pointerdown', function(e){
+    canvas.setPointerCapture(e.pointerId);
+    last.x=e.clientX; last.y=e.clientY; moved=false;
+
+    if(e.button===2){ mode='pan'; return; }
+    if(e.button!==0) return;
+
+    if(armed && armed.kind==='tool'){
+      var pt = groundHit(e);
+      var def = toolDef(armed.type);
+      var obj = {id:nextId++, type:def.type, w:def.w, d:def.d, h:def.h, x:clampCoord(snap(pt.x)), z:clampCoord(snap(pt.z)), rot:0};
+      state.objects.push(obj);
+      rebuildObjects(); selectObj(obj.id); persist(); refreshCount();
+      mode = null;
+      return;
+    }
+
+    if(armed && armed.kind==='prefab'){
+      var pt2 = groundHit(e);
+      var prefab = prefabById(armed.id);
+      var baseX = snap(pt2.x), baseZ = snap(pt2.z);
+      var newIds = [];
+      prefab.objects.forEach(function(rel){
+        var obj = {id:nextId++, type:rel.type, w:rel.w, d:rel.d, h:rel.h,
+          x:clampCoord(baseX+rel.x), z:clampCoord(baseZ+rel.z), rot:rel.rot||0};
+        state.objects.push(obj);
+        newIds.push(obj.id);
+      });
+      rebuildObjects(); selectObj(newIds[newIds.length-1]); persist(); refreshCount();
+      mode = null;
+      return;
+    }
+
+    var hitId = pickObject(e);
+    if(hitId!=null){
+      selectObj(hitId);
+      mode='drag';
+    } else {
+      selectObj(null);
+      mode='orbit';
+    }
+  });
+
+  window.addEventListener('pointermove', function(e){
+    if(!mode) return;
+    var dx = e.clientX-last.x, dy = e.clientY-last.y;
+    if(Math.abs(dx)>2||Math.abs(dy)>2) moved=true;
+    last.x=e.clientX; last.y=e.clientY;
+
+    if(mode==='orbit'){
+      camAngleY -= dx*0.006;
+      camAngleX += dy*0.006;
+      updateCamera();
+    } else if(mode==='pan'){
+      var right = new THREE.Vector3(Math.sin(camAngleY+Math.PI/2),0,Math.cos(camAngleY+Math.PI/2));
+      var fwd = new THREE.Vector3(Math.sin(camAngleY),0,Math.cos(camAngleY));
+      camTarget.addScaledVector(right, -dx*0.08);
+      camTarget.addScaledVector(fwd, dy*0.08);
+      camTarget.x = Math.max(-70,Math.min(70,camTarget.x));
+      camTarget.z = Math.max(-70,Math.min(70,camTarget.z));
+      updateCamera();
+    } else if(mode==='drag'){
+      var o = selectedObj();
+      if(!o) return;
+      var pt3 = groundHit(e);
+      o.x = clampCoord(snap(pt3.x)); o.z = clampCoord(snap(pt3.z));
+      rebuildObjects(); selectObj(o.id);
+    }
+  });
+
+  window.addEventListener('pointerup', function(){
+    if(mode==='drag') persist();
+    mode=null;
+  });
+
+  canvas.addEventListener('wheel', function(e){
+    e.preventDefault();
+    camDist += e.deltaY*0.05;
+    updateCamera();
+  }, {passive:false});
+
+  window.addEventListener('keydown', function(e){
+    if(e.key==='Escape'){ armed=null; refreshArmedUI(); selectObj(null); }
+    if((e.key==='Delete'||e.key==='Backspace') && selectedObj() && document.activeElement.tagName!=='INPUT'){
+      var o = selectedObj();
+      state.objects = state.objects.filter(function(it){ return it.id!==o.id; });
+      selectObj(null); rebuildObjects(); persist(); refreshCount();
+    }
+  });
+
+  /* ---- go ---- */
+  applyTheme();
+  rebuildObjects();
+  refreshCount();
+
+  function loop(){
+    requestAnimationFrame(loop);
+    renderer.render(scene,camera);
+  }
+  loop();
+}
+})();
+</script>
+</body>
+</html>
