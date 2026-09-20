@@ -106,6 +106,28 @@
   .sh-pillar{width:26%;height:100%;background:#c7ccd4;border:1.5px solid #00000022;border-radius:2px}
   .sh-platform{width:82%;height:34%;background:#c7ccd4;border:1.5px solid #00000022;border-radius:3px;align-self:flex-end}
   .sh-ramp{width:0;height:0;border-left:26px solid transparent;border-bottom:20px solid #c98a45}
+  .sh-halfwall{width:78%;height:34%;background:#e6c383;border:1.5px solid #00000022;border-radius:3px;align-self:flex-end}
+  .sh-stairs{width:70%;height:60%;background:repeating-linear-gradient(0deg,#c98a45 0 4px,#a97538 4px 5px);border:1.5px solid #00000022;border-radius:3px}
+  .sh-arch{width:70%;height:100%;position:relative}
+  .sh-arch::before,.sh-arch::after{content:'';position:absolute;top:0;bottom:0;width:24%;background:#e6c383;border:1.5px solid #00000022}
+  .sh-arch::before{left:0}
+  .sh-arch::after{right:0}
+  .sh-barrel{width:44%;height:90%;background:#c7ccd4;border:1.5px solid #00000022;border-radius:45%/14%}
+  .sh-sphere{width:58%;height:58%;background:#c7ccd4;border:1.5px solid #00000022;border-radius:50%;align-self:center}
+  .sh-cone{width:0;height:0;border-left:19px solid transparent;border-right:19px solid transparent;border-bottom:28px solid #c7ccd4}
+
+  .size-row{display:flex; gap:6px}
+  .size-btn{flex:1; border:2px solid var(--chip-line); background:var(--chip); border-radius:10px; padding:7px 4px; cursor:pointer; font:800 11.5px 'Inter',sans-serif; color:var(--ink-soft)}
+  .size-btn.sel{background:#fff; border-color:var(--accent); color:var(--ink)}
+
+  .glow-toggle{display:flex;align-items:center;justify-content:space-between;background:#fff;border:2px solid var(--chip-line);border-radius:10px;padding:7px 10px}
+  .glow-toggle b{font-size:12px}
+  .switch{position:relative;width:38px;height:22px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .switch .slider{position:absolute;inset:0;background:#d8dde3;border-radius:100px;transition:.15s;cursor:pointer}
+  .switch .slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 3px #0003}
+  .switch input:checked + .slider{background:#ffb347}
+  .switch input:checked + .slider:before{transform:translateX(16px)}
 
   .prefab-list{display:flex;flex-direction:column;gap:6px}
   .prefab-btn{
@@ -205,7 +227,7 @@
 
     <div class="tip" id="tip">
       <button type="button" class="tip-close" id="tipClose" aria-label="Dismiss">&times;</button>
-      <b>How this works:</b> pick a piece (or a ready-made structure) below, then click anywhere on the ground to drop it. Click a piece already on the ground to move, resize or delete it. When you're happy, hit <b>Submit for approval</b> at the bottom &mdash; Amy reviews every map before it goes live.
+      <b>How this works:</b> pick a piece (or a ready-made structure) below, then click anywhere on the ground to drop it. Click a piece already on the ground to move, resize (drag its handles or use the sliders) or delete it. When you're happy, hit <b>Submit for approval</b> at the bottom &mdash; they review every map before it goes live.
     </div>
 
     <div class="field">
@@ -218,12 +240,17 @@
     </div>
     <div class="field">
       <label for="submitterName">Your name</label>
-      <input type="text" id="submitterName" maxlength="24" placeholder="How should Amy know it's yours?">
+      <input type="text" id="submitterName" maxlength="24" placeholder="How should they know it's yours?">
     </div>
 
     <div>
       <p class="section-title" style="margin-bottom:6px">Sky &amp; theme</p>
       <div class="theme-row" id="themeRow"></div>
+    </div>
+
+    <div>
+      <p class="section-title" style="margin-bottom:6px">Map size</p>
+      <div class="size-row" id="sizeRow"></div>
     </div>
 
     <hr class="hr">
@@ -251,7 +278,7 @@
     <hr class="hr">
 
     <div class="submit-box">
-      <p><b style="color:var(--ink)">Send this to Amy.</b> She reviews every submitted map, and approved ones show up as real, playable maps in Egg Assault.</p>
+      <p><b style="color:var(--ink)">Send this in for review.</b> They review every submitted map, and approved ones show up as real, playable maps in Egg Assault.</p>
       <button class="btn btn-good" id="submitBtn" type="button">Submit for approval</button>
       <div class="submit-status" id="submitStatus"></div>
       <button type="button" class="fallback-toggle" id="fallbackToggle">Submitting not working? Get map code instead</button>
@@ -282,6 +309,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="map-shapes.js"></script>
 <script>
 (function(){
 "use strict";
@@ -308,13 +336,13 @@ var THEMES = [
 ];
 function themeById(id){ for(var i=0;i<THEMES.length;i++) if(THEMES[i].id===id) return THEMES[i]; return THEMES[0]; }
 
-var TOOLS = [
-  {type:'wall',    label:'Wall',     shape:'sh-wall',     w:6,  d:1,  h:4},
-  {type:'crate',   label:'Crate',    shape:'sh-crate',    w:2,  d:2,  h:2},
-  {type:'pillar',  label:'Pillar',   shape:'sh-pillar',   w:1.6,d:1.6,h:5},
-  {type:'platform',label:'Platform', shape:'sh-platform', w:8,  d:8,  h:2.6},
-  {type:'ramp',    label:'Ramp',     shape:'sh-ramp',     w:2.6,d:4,  h:2.6}
-];
+var SHAPE_CSS = {
+  wall:'sh-wall', halfwall:'sh-halfwall', crate:'sh-crate', pillar:'sh-pillar', platform:'sh-platform',
+  ramp:'sh-ramp', stairs:'sh-stairs', arch:'sh-arch', barrel:'sh-barrel', sphere:'sh-sphere', cone:'sh-cone'
+};
+var TOOLS = EggMapShapes.SHAPE_DEFS.map(function(d){
+  return {type:d.type, label:d.label, shape:SHAPE_CSS[d.type]||'sh-crate', w:d.w, d:d.d, h:d.h};
+});
 function toolDef(type){ for(var i=0;i<TOOLS.length;i++) if(TOOLS[i].type===type) return TOOLS[i]; return TOOLS[0]; }
 
 /* ---- ready-made multi-piece structures. Positions are relative to
@@ -399,7 +427,7 @@ function cachedName(){
 }
 function defaultState(){
   return {
-    name:'My Map', tag:'A custom arena', theme:'sunnyyard', submitter:cachedName(),
+    name:'My Map', tag:'A custom arena', theme:'sunnyyard', mapSize:'medium', submitter:cachedName(),
     objects: freshObjects(TEMPLATES.openfield.objects)
   };
 }
@@ -424,6 +452,7 @@ function persist(){
 function boot(){
   state = loadState() || defaultState();
   if(state.submitter==null) state.submitter = cachedName();
+  if(!state.mapSize) state.mapSize = 'medium';
   if(!state.objects || !state.objects.length) state.objects = freshObjects(TEMPLATES.openfield.objects);
   var maxId = 0;
   state.objects.forEach(function(o){ if(o.id>maxId) maxId=o.id; });
@@ -468,6 +497,23 @@ function startApp(){
       applyTheme();
     });
     themeRow.appendChild(b);
+  });
+
+  /* ---- map size buttons ---- */
+  var sizeRow = document.getElementById('sizeRow');
+  var sizeButtons = {};
+  Object.keys(EggMapShapes.MAP_SIZES).forEach(function(id){
+    var s = EggMapShapes.MAP_SIZES[id];
+    var b = document.createElement('button');
+    b.type='button'; b.className='size-btn'+(id===state.mapSize?' sel':'');
+    b.textContent = s.label;
+    b.addEventListener('click', function(){
+      state.mapSize = id; persist();
+      Object.keys(sizeButtons).forEach(function(k){ sizeButtons[k].classList.toggle('sel', k===id); });
+      applyMapSize();
+    });
+    sizeRow.appendChild(b);
+    sizeButtons[id]=b;
   });
 
   /* ---- armed placement state: either a single tool or a prefab stamp ---- */
@@ -563,13 +609,14 @@ function startApp(){
       tag: (state.tag||'A custom arena').trim() || 'A custom arena',
       submitter: (state.submitter||'').trim() || 'Anonymous',
       theme: t.id,
+      mapSize: state.mapSize || 'medium',
       colors: {
         sky: t.sky, fog: t.fog, bg: t.bg, floor: t.floor, floorLine: t.floorLine,
         wall: t.wall, wallStripe: t.wallStripe, wallDark: t.wallDark,
         crate: t.crate, pillar: t.pillar, ambient: t.ambient, sun: t.sun
       },
       objects: state.objects.map(function(o){
-        return {type:o.type, x:round1(o.x), z:round1(o.z), w:round1(o.w), d:round1(o.d), h:round1(o.h), rot:o.rot||0};
+        return {type:o.type, x:round1(o.x), z:round1(o.z), w:round1(o.w), d:round1(o.d), h:round1(o.h), rot:o.rot||0, glow: !!o.glow};
       })
     };
   }
@@ -602,7 +649,7 @@ function startApp(){
       submitBtn.disabled = false;
       if(res.ok && res.data && res.data.ok){
         submitStatus.className = 'submit-status ok';
-        submitStatus.textContent = "Sent! Amy will take a look and approve it if it's a good fit.";
+        submitStatus.textContent = "Sent! They'll take a look and approve it if it's a good fit.";
       } else {
         submitStatus.className = 'submit-status err';
         submitStatus.textContent = (res.data && res.data.error) || "That didn't go through. Try the map code option below.";
@@ -666,6 +713,22 @@ function startApp(){
   bwall(0,-58,118,1); bwall(0,58,118,1); bwall(-58,0,1,116); bwall(58,0,1,116);
   scene.add(boundaryGroup);
 
+  /* ---- map size: resizes ground/grid/boundary and the drop-off bounds ---- */
+  var mapHalf = 58;
+  function applyMapSize(){
+    var sz = EggMapShapes.mapSizeById(state.mapSize);
+    var half = sz.half, full = half*2;
+    mapHalf = half - 2;
+    ground.geometry.dispose();
+    ground.geometry = new THREE.PlaneGeometry(full, full);
+    scene.remove(grid);
+    grid = new THREE.GridHelper(full, Math.max(4, Math.round(half/2)), 0xffffff, 0xffffff);
+    grid.material.opacity=0.18; grid.material.transparent=true; grid.position.y=0.02;
+    scene.add(grid);
+    boundaryGroup.children.slice().forEach(function(c){ boundaryGroup.remove(c); });
+    bwall(0,-half,full+2,1); bwall(0,half,full+2,1); bwall(-half,0,1,full); bwall(half,0,1,full);
+  }
+
   var spawnMarker = new THREE.Group();
   var spawnPole = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,2.4,8), new THREE.MeshBasicMaterial({color:0x1c2340}));
   spawnPole.position.y=1.2; spawnMarker.add(spawnPole);
@@ -695,40 +758,62 @@ function startApp(){
 
   function hexNum(h){ return parseInt(h.replace('#',''),16); }
 
+  var TYPE_COLOR_KEY = {
+    wall:'wall', halfwall:'wall', arch:'wall',
+    crate:'crate', ramp:'crate', stairs:'crate', barrel:'crate', cone:'crate',
+    pillar:'pillar', sphere:'pillar', platform:'pillar'
+  };
   function meshForObj(o, theme){
-    var color, geo, mesh;
-    if(o.type==='wall'){
-      geo = new THREE.BoxGeometry(o.w,o.h,o.d);
-      mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:hexNum(theme.wall)}));
-      mesh.position.set(o.x, o.h/2, o.z);
-    } else if(o.type==='crate'){
-      geo = new THREE.BoxGeometry(o.w,o.h,o.d);
-      mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:hexNum(theme.crate)}));
-      mesh.position.set(o.x, o.h/2, o.z);
-    } else if(o.type==='pillar'){
-      geo = new THREE.BoxGeometry(o.w,o.h,o.d);
-      mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:hexNum(theme.pillar)}));
-      mesh.position.set(o.x, o.h/2, o.z);
-      var bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16,8,8), new THREE.MeshBasicMaterial({color:0xffd35a}));
-      bulb.position.set(0,o.h/2+0.2,0);
-      mesh.add(bulb);
-    } else if(o.type==='platform'){
-      mesh = new THREE.Group();
-      var post = new THREE.Mesh(new THREE.BoxGeometry(1.7,o.h,1.7), new THREE.MeshLambertMaterial({color:hexNum(theme.pillar)}));
-      post.position.set(0,o.h/2,0); mesh.add(post);
-      var top = new THREE.Mesh(new THREE.BoxGeometry(o.w,0.3,o.d), new THREE.MeshLambertMaterial({color:hexNum(theme.pillar)}));
-      top.position.set(0,o.h-0.14,0); mesh.add(top);
-      mesh.position.set(o.x,0,o.z);
-    } else if(o.type==='ramp'){
-      geo = new THREE.BoxGeometry(o.w, 0.3, Math.sqrt(o.d*o.d+o.h*o.h));
-      mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:hexNum(theme.crate)}));
-      mesh.rotation.x = -Math.atan2(o.h,o.d);
-      mesh.position.set(o.x, o.h/2, o.z);
-    }
-    mesh.rotation.y = (o.rot||0)*Math.PI/180;
+    var colorKey = TYPE_COLOR_KEY[o.type] || 'crate';
+    var mesh = EggMapShapes.buildShapeVisual(THREE, o, theme[colorKey]);
     mesh.userData.id = o.id;
     mesh.castShadow=false;
     return mesh;
+  }
+
+  /* ---- resize handles: small draggable markers around the selected piece ---- */
+  var handlesGroup = new THREE.Group();
+  scene.add(handlesGroup);
+  var HANDLE_KEYS = ['u+','u-','v+','v-','h'];
+  var handleMeshes = {};
+  var handleMat = new THREE.MeshBasicMaterial({color:0xff8c4d});
+  var handleMatH = new THREE.MeshBasicMaterial({color:0x4fa8d6});
+  HANDLE_KEYS.forEach(function(k){
+    var m = new THREE.Mesh(new THREE.SphereGeometry(0.5,10,8), k==='h'?handleMatH:handleMat);
+    m.userData.handle = k;
+    m.visible = false;
+    handlesGroup.add(m);
+    handleMeshes[k]=m;
+  });
+  function localAxes(rotDeg){
+    var th = (rotDeg||0)*Math.PI/180;
+    return { u:{x:Math.cos(th), z:-Math.sin(th)}, v:{x:Math.sin(th), z:Math.cos(th)} };
+  }
+  function updateHandles(){
+    var o = selectedObj();
+    if(!o){ HANDLE_KEYS.forEach(function(k){ handleMeshes[k].visible=false; }); return; }
+    var def = EggMapShapes.shapeDef(o.type);
+    var ax = localAxes(o.rot);
+    var halfW = o.w/2, halfD = o.d/2, pad = 0.5;
+    handleMeshes['u+'].position.set(o.x+ax.u.x*(halfW+pad), o.h*0.5, o.z+ax.u.z*(halfW+pad));
+    handleMeshes['u-'].position.set(o.x-ax.u.x*(halfW+pad), o.h*0.5, o.z-ax.u.z*(halfW+pad));
+    handleMeshes['u+'].visible = true;
+    handleMeshes['u-'].visible = true;
+    if(def.radial){
+      handleMeshes['v+'].visible = false;
+      handleMeshes['v-'].visible = false;
+    } else {
+      handleMeshes['v+'].position.set(o.x+ax.v.x*(halfD+pad), o.h*0.5, o.z+ax.v.z*(halfD+pad));
+      handleMeshes['v-'].position.set(o.x-ax.v.x*(halfD+pad), o.h*0.5, o.z-ax.v.z*(halfD+pad));
+      handleMeshes['v+'].visible = true;
+      handleMeshes['v-'].visible = true;
+    }
+    if(def.uniform){
+      handleMeshes['h'].visible = false;
+    } else {
+      handleMeshes['h'].position.set(o.x, o.h+pad, o.z);
+      handleMeshes['h'].visible = true;
+    }
   }
 
   function rebuildObjects(){
@@ -793,6 +878,7 @@ function startApp(){
       selBox.geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(size.x+0.15,size.y+0.15,size.z+0.15));
       selBox.position.copy(center);
     }
+    updateHandles();
     renderInspector();
   }
 
@@ -801,17 +887,14 @@ function startApp(){
     var o = selectedObj();
     if(!o){ panel.style.display='none'; panel.innerHTML=''; return; }
     panel.style.display='flex';
-    var def = toolDef(o.type);
-    var ranges = {
-      wall:{w:[2,30,.5],d:[.5,4,.5],h:[2,8,.5]},
-      crate:{w:[1,8,.5],d:[1,8,.5],h:[1,8,.5]},
-      pillar:{w:[1,3,.2],d:[1,3,.2],h:[2,9,.5]},
-      platform:{w:[3,20,.5],d:[3,20,.5],h:[1,7,.5]},
-      ramp:{w:[1.5,8,.5],d:[2,14,.5],h:[1,7,.5]}
-    }[o.type];
+    var def = EggMapShapes.shapeDef(o.type);
+    var ranges = def.ranges;
+    var rowsHtml = row('W', 'w', ranges.w);
+    if(!def.radial) rowsHtml += row('D', 'd', ranges.d);
+    if(!def.uniform) rowsHtml += row('H', 'h', ranges.h);
     panel.innerHTML =
       '<div class="title"><b>'+def.label+'</b><span style="font-size:11px;color:var(--ink-soft)">#'+o.id+'</span></div>'+
-      row('W', 'w', ranges.w) + row('D', 'd', ranges.d) + row('H', 'h', ranges.h);
+      rowsHtml;
     function row(label,key,r){
       return '<div class="row"><label>'+label+'</label><input type="range" data-key="'+key+'" min="'+r[0]+'" max="'+r[1]+'" step="'+r[2]+'" value="'+o[key]+'"><span class="val" data-valfor="'+key+'">'+o[key]+'</span></div>';
     }
@@ -819,10 +902,21 @@ function startApp(){
       inp.addEventListener('input', function(){
         var k = inp.dataset.key;
         o[k] = parseFloat(inp.value);
+        if(def.radial) o.d = o.w;
+        if(def.uniform){ o.d = o.w; o.h = o.w; }
         panel.querySelector('[data-valfor="'+k+'"]').textContent = o[k];
         rebuildObjects(); selectObj(o.id); persist();
       });
     });
+
+    var glowWrap = document.createElement('div');
+    glowWrap.className = 'glow-toggle';
+    glowWrap.innerHTML = '<b>Glow</b><label class="switch"><input type="checkbox" id="glowChk"'+(o.glow?' checked':'')+'><span class="slider"></span></label>';
+    panel.appendChild(glowWrap);
+    document.getElementById('glowChk').addEventListener('change', function(e){
+      o.glow = !!e.target.checked; rebuildObjects(); selectObj(o.id); persist();
+    });
+
     var btnRow = document.createElement('div');
     btnRow.className='btn-row';
     btnRow.innerHTML =
@@ -877,10 +971,19 @@ function startApp(){
     while(obj && obj.userData.id==null) obj = obj.parent;
     return obj ? obj.userData.id : null;
   }
+  function pickHandle(e){
+    setNdc(e); raycaster.setFromCamera(ndc,camera);
+    var visible = handlesGroup.children.filter(function(m){return m.visible;});
+    if(!visible.length) return null;
+    var hits = raycaster.intersectObjects(visible, true);
+    return hits.length ? hits[0].object.userData.handle : null;
+  }
   function snap(n){ return Math.round(n/1)*1; }
-  function clampCoord(n){ return Math.max(-50, Math.min(50, n)); }
+  function clampCoord(n){ return Math.max(-mapHalf, Math.min(mapHalf, n)); }
+  function clampRange(n, r){ return Math.max(r[0], Math.min(r[1], n)); }
 
-  var mode = null; // 'orbit' | 'pan' | 'drag'
+  var mode = null; // 'orbit' | 'pan' | 'drag' | 'resize-u+' | 'resize-u-' | 'resize-v+' | 'resize-v-' | 'resize-h'
+  var resizeStart = null;
   var last = {x:0,y:0};
   var moved = false;
 
@@ -893,10 +996,20 @@ function startApp(){
     if(e.button===2){ mode='pan'; return; }
     if(e.button!==0) return;
 
+    if(!armed){
+      var hkey = pickHandle(e);
+      var so0 = selectedObj();
+      if(hkey && so0){
+        mode = 'resize-'+hkey;
+        resizeStart = { o: so0, x: so0.x, z: so0.z, w: so0.w, d: so0.d, h: so0.h, rot: so0.rot||0, startY: e.clientY };
+        return;
+      }
+    }
+
     if(armed && armed.kind==='tool'){
       var pt = groundHit(e);
       var def = toolDef(armed.type);
-      var obj = {id:nextId++, type:def.type, w:def.w, d:def.d, h:def.h, x:clampCoord(snap(pt.x)), z:clampCoord(snap(pt.z)), rot:0};
+      var obj = {id:nextId++, type:def.type, w:def.w, d:def.d, h:def.h, x:clampCoord(snap(pt.x)), z:clampCoord(snap(pt.z)), rot:0, glow:false};
       state.objects.push(obj);
       rebuildObjects(); selectObj(obj.id); persist(); refreshCount();
       mode = null;
@@ -910,7 +1023,7 @@ function startApp(){
       var newIds = [];
       prefab.objects.forEach(function(rel){
         var obj = {id:nextId++, type:rel.type, w:rel.w, d:rel.d, h:rel.h,
-          x:clampCoord(baseX+rel.x), z:clampCoord(baseZ+rel.z), rot:rel.rot||0};
+          x:clampCoord(baseX+rel.x), z:clampCoord(baseZ+rel.z), rot:rel.rot||0, glow: rel.glow||false};
         state.objects.push(obj);
         newIds.push(obj.id);
       });
@@ -944,8 +1057,8 @@ function startApp(){
       var fwd = new THREE.Vector3(Math.sin(camAngleY),0,Math.cos(camAngleY));
       camTarget.addScaledVector(right, -dx*0.08);
       camTarget.addScaledVector(fwd, dy*0.08);
-      camTarget.x = Math.max(-70,Math.min(70,camTarget.x));
-      camTarget.z = Math.max(-70,Math.min(70,camTarget.z));
+      camTarget.x = Math.max(-mapHalf-20,Math.min(mapHalf+20,camTarget.x));
+      camTarget.z = Math.max(-mapHalf-20,Math.min(mapHalf+20,camTarget.z));
       updateCamera();
     } else if(mode==='drag'){
       var o = selectedObj();
@@ -953,12 +1066,39 @@ function startApp(){
       var pt3 = groundHit(e);
       o.x = clampCoord(snap(pt3.x)); o.z = clampCoord(snap(pt3.z));
       rebuildObjects(); selectObj(o.id);
+    } else if(mode && mode.indexOf('resize-')===0){
+      var so = resizeStart.o;
+      var def = EggMapShapes.shapeDef(so.type);
+      var key = mode.slice(7);
+      if(key==='h'){
+        var dyPix = e.clientY - resizeStart.startY;
+        var newH = clampRange(resizeStart.h - dyPix*0.05, def.ranges.h);
+        so.h = newH;
+        if(def.uniform){ so.w = newH; so.d = newH; }
+      } else {
+        var ax = localAxes(resizeStart.rot);
+        var pt4 = groundHit(e);
+        var isU = key.charAt(0)==='u';
+        var sign = key.charAt(1)==='+' ? 1 : -1;
+        var dir = isU ? ax.u : ax.v;
+        var half0 = (isU ? resizeStart.w : resizeStart.d)/2;
+        var fixedX = resizeStart.x - dir.x*half0*sign, fixedZ = resizeStart.z - dir.z*half0*sign;
+        var proj = (pt4.x-fixedX)*dir.x*sign + (pt4.z-fixedZ)*dir.z*sign;
+        var range = isU ? def.ranges.w : def.ranges.d;
+        var newLen = clampRange(proj, range);
+        var newCx = fixedX + dir.x*(newLen/2)*sign;
+        var newCz = fixedZ + dir.z*(newLen/2)*sign;
+        if(isU){ so.w = newLen; if(def.radial) so.d = newLen; if(def.uniform) so.h = newLen; }
+        else { so.d = newLen; }
+        so.x = clampCoord(newCx); so.z = clampCoord(newCz);
+      }
+      rebuildObjects(); selectObj(so.id);
     }
   });
 
   window.addEventListener('pointerup', function(){
-    if(mode==='drag') persist();
-    mode=null;
+    if(mode==='drag' || (mode && mode.indexOf('resize-')===0)) persist();
+    mode=null; resizeStart=null;
   });
 
   canvas.addEventListener('wheel', function(e){
@@ -977,6 +1117,7 @@ function startApp(){
   });
 
   /* ---- go ---- */
+  applyMapSize();
   applyTheme();
   rebuildObjects();
   refreshCount();
