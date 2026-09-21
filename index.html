@@ -575,7 +575,192 @@ function buildArena(mapId){
     arenaGroup.add(mesh);
     const wd=orientWD(o);
     if(o.type==='wall'||o.type==='halfwall'||o.type==='crate'||o.type==='pillar'){
-      Weapon(){
+      colliders.push({minX:o.x-wd.w/2,maxX:o.x+wd.w/2,minZ:o.z-wd.d/2,maxZ:o.z+wd.d/2});
+      if(o.type==='pillar'){ const l=new THREE.PointLight(0xffd35a,3.5,10); l.position.set(o.x,o.h+0.4,o.z); arenaGroup.add(l); }
+    } else if(o.type==='platform'){
+      platforms.push({minX:o.x-wd.w/2,maxX:o.x+wd.w/2,minZ:o.z-wd.d/2,maxZ:o.z+wd.d/2,kind:'flat',top:o.h});
+    } else if(o.type==='ramp'){
+      const steps=(Math.round((o.rot||0)/90)%4+4)%4, x=o.x,z=o.z,w=o.w,d=o.d,h=o.h;
+      let rect,axis,lowCoord,highCoord;
+      if(steps===0){ rect={minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}; axis='z'; lowCoord=z-d/2; highCoord=z+d/2; }
+      else if(steps===2){ rect={minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}; axis='z'; lowCoord=z+d/2; highCoord=z-d/2; }
+      else if(steps===1){ rect={minX:x-d/2,maxX:x+d/2,minZ:z-w/2,maxZ:z+w/2}; axis='x'; lowCoord=x-d/2; highCoord=x+d/2; }
+      else { rect={minX:x-d/2,maxX:x+d/2,minZ:z-w/2,maxZ:z+w/2}; axis='x'; lowCoord=x+d/2; highCoord=x-d/2; }
+      platforms.push(Object.assign({kind:'ramp',axis,lowCoord,highCoord,h},rect));
+    } else if(o.type==='stairs'){
+      EggMapShapes.stairsSteps(o).forEach(r=>{
+        platforms.push({minX:r.minX,maxX:r.maxX,minZ:r.minZ,maxZ:r.maxZ,kind:'flat',top:r.top});
+      });
+    } else if(o.type==='arch'){
+      const ap=EggMapShapes.archParts(o);
+      colliders.push({minX:ap.postA.minX,maxX:ap.postA.maxX,minZ:ap.postA.minZ,maxZ:ap.postA.maxZ});
+      colliders.push({minX:ap.postB.minX,maxX:ap.postB.maxX,minZ:ap.postB.minZ,maxZ:ap.postB.maxZ});
+      /* lintel deliberately has no collider here either, matching addCustomArch above */
+    }
+  }
+  function buildCustomLayout(objects){
+    objects.forEach(o=>{
+      const wd=orientWD(o);
+      if(o.color && o.type!=='barrel' && o.type!=='sphere' && o.type!=='cone'){
+        addCustomColored(o);
+      } else if(o.type==='wall'){
+        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
+      } else if(o.type==='halfwall'){
+        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
+      } else if(o.type==='crate'){
+        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,crateMat);
+      } else if(o.type==='pillar'){
+        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,pillarMat);
+        const l=new THREE.PointLight(0xffd35a,3.5,10); l.position.set(o.x,o.h+0.4,o.z); arenaGroup.add(l);
+      } else if(o.type==='platform'){
+        addDeck(o.x,o.z,wd.w,wd.d,o.h,pillarMat);
+      } else if(o.type==='ramp'){
+        addRamp(o.x,o.z,o.w,o.d,o.h,o.rot||0,crateMat);
+      } else if(o.type==='stairs'){
+        addCustomStairs(o,crateMat);
+      } else if(o.type==='arch'){
+        addCustomArch(o,wallMat);
+      } else if(o.type==='barrel'||o.type==='sphere'||o.type==='cone'){
+        addCustomRadial(o,o.type);
+      }
+      if(o.glow) addGlowLight(o);
+    });
+  }
+
+  /* half/full default to exactly the numbers the 3 built-in maps always used (58/116), so this
+     branch is a no-op for them. Only a community map carries m.mapSize, and only then does the
+     ground/boundary/out-of-bounds limit actually change size. */
+  let half=58, full=116;
+  if(m.mapSize){
+    const sz=EggMapShapes.mapSizeById(m.mapSize);
+    half=sz.half; full=half*2;
+  }
+  ARENA_LIMIT=m.mapSize?Math.max(6,half-4):54;
+
+  const groundMesh=new THREE.Mesh(new THREE.PlaneGeometry(full+14,full+14),groundMat);
+  groundMesh.rotation.x=-Math.PI/2; groundMesh.receiveShadow=true; arenaGroup.add(groundMesh);
+
+  abox(0,3,-half,full+2,6,1,wallMat); abox(0,3,half,full+2,6,1,wallMat);
+  abox(-half,3,0,1,6,full,wallMat); abox(half,3,0,1,6,full,wallMat);
+
+  if(m.customObjects){
+    /* a player-built map from the Map Studio: everything on it came from that data-driven
+       object list instead of the hand-placed layout below. */
+    buildCustomLayout(m.customObjects);
+  } else {
+  /* ground-level crate clusters, scattered wider across the bigger yard */
+  [[0,1.4,0,10,2.8,3],[-12,1.4,-8,7,2.8,3],[12,1.4,-9,8,2.8,3],
+   [-7,1.4,9,8,2.8,3],[15,1.4,9,7,2.8,3],[-19,1.4,17,4,2.8,5],[20,1.4,19,4,2.8,5],
+   [-34,1.4,-6,6,2.8,6],[34,1.4,-20,5,2.8,9],[-40,1.4,24,9,2.8,4],[38,1.4,32,6,2.8,6],
+   [-22,1.4,-38,7,2.8,4],[26,1.4,-40,4,2.8,8],[0,1.4,-44,12,2.8,3],[-46,1.4,-2,4,2.8,10]]
+   .forEach(a=>asolid(...a,crateMat));
+
+  /* inner pillar ring -- every pillar is still there, but only every other one carries a
+     real-time light now. ~20 dynamic point lights was the single biggest GPU cost in this
+     scene (every lit fragment on screen gets shaded against every light), so thinning the
+     rings out is the highest-value perf win available without changing how the map looks */
+  for(let i=0;i<8;i++){
+    const a=i*Math.PI/4, px=Math.cos(a)*23, pz=Math.sin(a)*23;
+    asolid(px,2.5,pz,2,5,2,pillarMat);
+    if(i%2===0){ const l=new THREE.PointLight(0xffd35a,4,9); l.position.set(px,5.8,pz); arenaGroup.add(l); }
+  }
+  /* outer lamp ring, marks the far edges of the bigger map */
+  for(let i=0;i<10;i++){
+    const a=i*Math.PI/5+.3, px=Math.cos(a)*49, pz=Math.sin(a)*49;
+    asolid(px,3,pz,1.6,6,1.6,pillarMat);
+    if(i%2===0){ const l=new THREE.PointLight(m.sun,3.5,12); l.position.set(px,6.6,pz); arenaGroup.add(l); }
+  }
+
+  /* explorable raised plazas: staircases up to lookout decks, one per compass-ish direction */
+  const plazas=[
+    {x:-30,z:-30,dir:{x:1,z:1},deckW:9,deckD:9,h:2.4},
+    {x:30,z:-32,dir:{x:-1,z:1},deckW:8,deckD:8,h:2.2},
+    {x:32,z:30,dir:{x:-1,z:-1},deckW:10,deckD:10,h:3.0},
+    {x:-32,z:32,dir:{x:1,z:-1},deckW:7,deckD:7,h:2.2}
+  ];
+  plazas.forEach(pz=>{
+    const steps=Math.round(pz.h/0.4);
+    const stairX=pz.x-pz.dir.x*(pz.deckW/2+0.6), stairZ=pz.z-pz.dir.z*(pz.deckD/2+0.6);
+    addStairs(stairX,stairZ,pz.dir.x,pz.dir.z,steps,2.4,0.62,pz.h/steps,crateMat);
+    addDeck(pz.x,pz.z,pz.deckW,pz.deckD,pz.h,pillarMat);
+    abox(pz.x,pz.h+1.6,pz.z-pz.deckD/2+0.3,pz.deckW*.7,1.4,0.4,crateMat);
+    const l=new THREE.PointLight(0xffd35a,5,14); l.position.set(pz.x,pz.h+3.4,pz.z); arenaGroup.add(l);
+  });
+  }
+
+  /* fold each map cell's collected blocks into one draw call per cell per material, plus one
+     outline mesh per cell -- still just a handful of draw calls for anything on screen, but each
+     one now only covers a small patch of the map so off-screen cells get culled automatically */
+  const matByKind={wall:wallMat,crate:crateMat,pillar:pillarMat};
+  function addMerged(geoms,mat){
+    if(!geoms.length) return;
+    const merged=mergeBoxGeoms(geoms);
+    geoms.forEach(g=>g.dispose());
+    const mesh=new THREE.Mesh(merged,mat);
+    mesh.castShadow=mesh.receiveShadow=true;
+    arenaGroup.add(mesh);
+  }
+  Object.keys(chunkBuckets).forEach(key=>{
+    const kind=key.slice(0,key.indexOf('|'));
+    addMerged(chunkBuckets[key],matByKind[kind]);
+  });
+  Object.keys(outlineBuckets).forEach(cell=>{
+    const geoms=outlineBuckets[cell];
+    if(!geoms.length) return;
+    const mergedOutline=mergeBoxGeoms(geoms);
+    geoms.forEach(g=>g.dispose());
+    const outMesh=new THREE.Mesh(mergedOutline,outlineMat);
+    outMesh.renderOrder=-1;
+    arenaGroup.add(outMesh);
+  });
+}
+buildArena(selectedMapId);
+
+/* ---------- lobby preview character (shown rotating behind the menu) ----------
+   Parked far away on its own +Z axis (well past the fog's draw distance) so the
+   real arena never shows up behind it, no matter how the preview camera is framed. */
+const PREVIEW_Z=-260;
+const previewEgg=new THREE.Group();
+previewEgg.position.set(0,16,PREVIEW_Z);
+previewEgg.visible=false;
+scene.add(previewEgg);
+const previewLight=new THREE.PointLight(0xfff2d0,6,16);
+previewLight.position.set(1.2,18.4,PREVIEW_Z+2.2);
+scene.add(previewLight);
+const previewLight2=new THREE.PointLight(0x8fd1ff,2.5,16);
+previewLight2.position.set(-2,15.5,PREVIEW_Z-1.5);
+scene.add(previewLight2);
+/* a bright yard patch (fading into the fog at the horizon) plus a soft contact shadow
+   under the lobby character, so it reads as standing in a sunny spot rather than
+   floating in empty sky */
+function makeShadowBlobTexture(){
+  const cvs=document.createElement('canvas'); cvs.width=128; cvs.height=128;
+  const ctx=cvs.getContext('2d');
+  const g=ctx.createRadialGradient(64,64,4,64,64,63);
+  g.addColorStop(0,'rgba(12,28,48,0.42)');
+  g.addColorStop(.65,'rgba(12,28,48,0.18)');
+  g.addColorStop(1,'rgba(12,28,48,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(cvs);
+}
+const previewGround=new THREE.Mesh(
+  new THREE.CircleGeometry(60,36),
+  new THREE.MeshBasicMaterial({color:0xeaf7ff,transparent:true,opacity:.85,depthWrite:false,fog:true})
+);
+previewGround.rotation.x=-Math.PI/2;
+previewGround.position.set(0,15.9,PREVIEW_Z);
+previewGround.visible=false;
+previewGround.renderOrder=-1;
+scene.add(previewGround);
+const previewShadow=new THREE.Mesh(
+  new THREE.PlaneGeometry(1.8,1.8),
+  new THREE.MeshBasicMaterial({map:makeShadowBlobTexture(),transparent:true,depthWrite:false})
+);
+previewShadow.rotation.x=-Math.PI/2;
+previewShadow.position.set(0,15.95,PREVIEW_Z+.22);
+previewShadow.visible=false;
+scene.add(previewShadow);
+function updatePreviewWeapon(){
   while(previewEgg.children.length) previewEgg.remove(previewEgg.children[0]);
   previewEgg.add(egg(BOT_TYPES.yolk));
   const gp=buildGunModel(WEAPON_DEFS[selectedWeaponId]);
