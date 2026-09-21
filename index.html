@@ -1202,7 +1202,7 @@ function makeNameSprite(name){
   const mat=new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true});
   const spr=new THREE.Sprite(mat);
   spr.scale.set(1.4,.35,1);
-  spr.position.y=2.15;
+  spr.position.y=2.5;
   spr.renderOrder=999;
   return spr;
 }
@@ -1381,7 +1381,7 @@ function menuHTML(isDeath){
         <div class='sensrow'>SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
         <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
       </div>
-      ${isDeath?'':`<div class='hint'><b>WASD</b> move &middot; <b>MOUSE</b> aim &middot; <b>CLICK</b> fire &middot; <b>R</b> reload &middot; <b>SHIFT</b> sprint &middot; <b>SPACE</b> jump &middot; right-click to scope (sniper)</div>`}
+      ${isDeath?'':`<div class='hint'><b>WASD</b> move &middot; <b>MOUSE</b> aim &middot; <b>CLICK</b> fire &middot; <b>R</b> reload &middot; <b>SHIFT</b> zoom &middot; <b>SPACE</b> jump &middot; right-click to scope (sniper)</div>`}
     </div>`;
 }
 function buildSelectRow(containerId,defs,selectedId,onPick){
@@ -1517,6 +1517,10 @@ function spawnTracer(from,to,def){ spawnBullet(from,to,def); }
 
 /* ---------- combat ---------- */
 function isMoving(){ return !!(keys.w||keys.a||keys.s||keys.d); }
+/* SHIFT is a generic aim-down-sights zoom for every weapon (sprint used to live on this key --
+   it's gone now, the player is just faster all the time). Right-click keeps its own separate
+   full scope overlay, but only for weapons that define one (currently just the sniper). */
+function isAdsActive(){ return keys.shift||(isZoomed&&currentWeapon.zoom); }
 
 function killBot(bot){
   bot.alive=false;
@@ -1555,11 +1559,15 @@ function shoot(){
   } else {
     bots.forEach(b=>b.alive&&b.g.traverse(o=>o.isMesh&&targets.push(o)));
   }
+  /* walls/crates/pillars/etc block shots too now -- a ray that hits one of these first stops
+     there (the tracer visually stops at the wall) and just never reaches the bot/player lookup
+     below, so it silently counts as a miss instead of passing straight through. */
+  arenaGroup.traverse(o=>{ if(o.isMesh&&o.material!==outlineMat) targets.push(o); });
   const pelletCount=currentWeapon.pellets||1;
 
   for(let p=0;p<pelletCount;p++){
     const dir=baseDir.clone();
-    const spread=currentWeapon.spread*(isMoving()?1.6:1)+(keys.shift?currentWeapon.spread*.8:0);
+    const spread=currentWeapon.spread*(isMoving()?1.6:1)*(isAdsActive()?.5:1);
     dir.x+=(Math.random()-.5)*spread; dir.y+=(Math.random()-.5)*spread; dir.normalize();
     const ray=new THREE.Raycaster(origin,dir,0,80);
     const h=ray.intersectObjects(targets,false)[0];
@@ -1760,8 +1768,7 @@ document.addEventListener('pointerlockerror',()=>{ if(playing&&!dead&&!paused) o
 
 document.addEventListener('mousemove',e=>{
   if(!locked||dead) return;
-  const zoomActive=isZoomed&&currentWeapon.zoom;
-  const s=zoomActive?sensitivity*.35:sensitivity;
+  const s=isAdsActive()?sensitivity*.35:sensitivity;
   player.yaw-=e.movementX*s;
   player.pitch-=e.movementY*s;
   player.pitch=THREE.MathUtils.clamp(player.pitch,-1.3,1.3);
@@ -1806,7 +1813,7 @@ function update(dt){
       let dyaw=rp.targetYaw-rp.g.rotation.y;
       dyaw=Math.atan2(Math.sin(dyaw),Math.cos(dyaw));
       rp.g.rotation.y+=dyaw*lerpT;
-      if(rp.tag) rp.tag.position.y=2.15;
+      if(rp.tag) rp.tag.position.y=2.5;
     }
   }
   if(!playing||dead){
@@ -1835,7 +1842,7 @@ function update(dt){
 
   let moving=false;
   if(locked){
-    const sp=keys.shift?8:5.3;
+    const sp=7.6;
     const wish=_wishV.set(0,0,0);
     const fwd=_fwdV.set(-Math.sin(player.yaw),0,-Math.cos(player.yaw));
     const right=_rightV.set(Math.cos(player.yaw),0,-Math.sin(player.yaw));
@@ -1853,12 +1860,12 @@ function update(dt){
     resolveCollisions(playerPos,PLAYER_RADIUS);
     playerPos.x=THREE.MathUtils.clamp(playerPos.x,-ARENA_LIMIT,ARENA_LIMIT);
     playerPos.z=THREE.MathUtils.clamp(playerPos.z,-ARENA_LIMIT,ARENA_LIMIT);
-    if(moving) walkPhase+=dt*(keys.shift?15:9.5);
+    if(moving) walkPhase+=dt*12;
 
-    const zoomActive=isZoomed&&currentWeapon.zoom;
-    const targetFov=zoomActive?currentWeapon.zoomFov:(keys.shift&&moving?82:76);
+    const scopeActive=isZoomed&&currentWeapon.zoom;
+    const targetFov=isAdsActive()?(scopeActive?currentWeapon.zoomFov:55):76;
     if(Math.abs(targetFov-lastFov)>0.05){ lastFov=targetFov; cam.fov=targetFov; cam.updateProjectionMatrix(); }
-    weapon.visible=!zoomActive;
+    weapon.visible=!scopeActive;
   } else {
     velocity.multiplyScalar(Math.pow(0.001,dt));
   }
@@ -1885,7 +1892,7 @@ function update(dt){
   }
 
   const cross=document.getElementById('cross');
-  const spreadScale=1+(moving?.4:0)+(keys.shift?.3:0);
+  const spreadScale=(1+(moving?.4:0))*(isAdsActive()?.6:1);
   cross.style.transform='translate(-50%,-50%) scale('+spreadScale.toFixed(2)+')';
 
   for(const bot of bots){
