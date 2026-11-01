@@ -216,7 +216,7 @@ const cam=new THREE.PerspectiveCamera(76,1,.05,220);
 cam.rotation.order='YXZ';
 scene.add(cam);
 
-const hemi=new THREE.HemisphereLight(0xb8d6ef,0x151a25,2.2);
+const hemi=new THREE.HemisphereLight(0xb8d6ef,0x151a25,2.6);
 scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffdfaa,3.4);
 sun.position.set(-15,25,10);
@@ -229,13 +229,13 @@ scene.add(sun);
 applyGraphics();
 
 /* toon shading: shared cel gradient map + outline helper for a cartoony look */
-const toonGradTex=new THREE.DataTexture(new Uint8Array([80,80,80,255, 190,190,190,255, 255,255,255,255, 255,255,255,255]),4,1,THREE.RGBAFormat);
+const toonGradTex=new THREE.DataTexture(new Uint8Array([55,55,55,255, 175,175,175,255, 255,255,255,255, 255,255,255,255]),4,1,THREE.RGBAFormat);
 toonGradTex.minFilter=toonGradTex.magFilter=THREE.NearestFilter;
 toonGradTex.needsUpdate=true;
 const outlineMat=new THREE.MeshBasicMaterial({color:0x0c0a08,side:THREE.BackSide});
 function outline(mesh,s){
   const o=new THREE.Mesh(mesh.geometry,outlineMat);
-  o.scale.setScalar(s||1.09);
+  o.scale.setScalar(s||1.16);
   o.renderOrder=-1;
   mesh.add(o);
   return mesh;
@@ -362,7 +362,7 @@ const woodMat=MM(0x8a6a45,.85,0);
 
 function localBox(g,x,y,z,w,h,d,mat){
   const q=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
-  q.position.set(x,y,z); q.castShadow=true; outline(q,1.07); g.add(q);
+  q.position.set(x,y,z); q.castShadow=true; outline(q,1.14); g.add(q);
   return q;
 }
 
@@ -488,7 +488,7 @@ function buildArena(mapId){
     const kind=mat===wallMat?'wall':mat===crateMat?'crate':'pillar';
     const cell=cellKey(x,z);
     (chunkBuckets[kind+'|'+cell]||(chunkBuckets[kind+'|'+cell]=[])).push(geo.clone().translate(x,y,z));
-    (outlineBuckets[cell]||(outlineBuckets[cell]=[])).push(geo.clone().scale(1.045,1.045,1.045).translate(x,y,z));
+    (outlineBuckets[cell]||(outlineBuckets[cell]=[])).push(geo.clone().scale(1.08,1.08,1.08).translate(x,y,z));
     geo.dispose();
   }
   function asolid(x,y,z,w,h,d,mat){ abox(x,y,z,w,h,d,mat); colliders.push({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}); }
@@ -516,7 +516,7 @@ function buildArena(mapId){
     mesh.rotation.x=-Math.atan2(h,d);
     mesh.rotation.y=(rotDeg||0)*Math.PI/180;
     mesh.castShadow=true; mesh.receiveShadow=true;
-    outline(mesh,1.05);
+    outline(mesh,1.12);
     arenaGroup.add(mesh);
 
     const steps=(Math.round((rotDeg||0)/90)%4+4)%4;
@@ -588,7 +588,7 @@ function buildArena(mapId){
   function addCustomColored(o){
     const mesh=EggMapShapes.buildShapeVisual(THREE,Object.assign({},o,{glow:false}),o.color);
     const meshParts=[]; mesh.traverse(n=>{ if(n.isMesh) meshParts.push(n); });
-    meshParts.forEach(n=>{ n.castShadow=true; n.receiveShadow=true; outline(n,1.05); });
+    meshParts.forEach(n=>{ n.castShadow=true; n.receiveShadow=true; outline(n,1.12); });
     arenaGroup.add(mesh);
     const wd=orientWD(o);
     if(o.type==='wall'||o.type==='halfwall'||o.type==='crate'||o.type==='pillar'){
@@ -989,7 +989,7 @@ function egg(cfg){
   body.scale.set(.72*cfg.scale,.9*cfg.scale,.72*cfg.scale);
   body.position.y=1*cfg.scale;
   body.castShadow=true;
-  outline(body,1.07);
+  outline(body,1.14);
   g.add(body);
 
   for(const side of[-1,1]){
