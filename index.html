@@ -762,9 +762,8 @@ previewShadow.visible=false;
 scene.add(previewShadow);
 function updatePreviewWeapon(){
   while(previewEgg.children.length) previewEgg.remove(previewEgg.children[0]);
-  previewEgg.add(egg(BOT_TYPES.yolk));
-  const gp=buildGunModel(WEAPON_DEFS[selectedWeaponId]);
-  const w=gp.group;
+  previewEgg.add(getStaticEgg(BOT_TYPES.yolk));
+  const w=getStaticGun(WEAPON_DEFS[selectedWeaponId]);
   w.scale.setScalar(.85);
   w.position.set(.42,.98,.2);
   w.rotation.y=.15;
@@ -874,6 +873,63 @@ function buildGunModel(def){
   return buildAR(mats);
 }
 
+/* ---------- static model merging + instance caching (perf) ----------
+   Bots and remote players are many identical copies of a handful of shapes (3 egg types, a
+   bot weapon, a few player weapons). Building each one from scratch per spawn allocates a
+   fresh BufferGeometry for every tiny box/sphere every time (GC churn/stutter on wave start),
+   and -- far more importantly for steady framerate on a weak/integrated GPU -- turns one
+   egg+gun into ~25-30 separate draw calls, since draw-call submission is largely CPU-bound.
+   mergeStaticModel() takes a freshly-built model (a flat Group of small Meshes, some with one
+   outlined child using the shared outlineMat) and collapses it to one draw call per distinct
+   (material, castShadow, receiveShadow) combo -- grouping in the shadow flags too so a part
+   that never cast a shadow before still doesn't after merging, pixel-identical result. The
+   merged template is cached and only ever .clone()'d per spawn, which shares the same
+   geometry/material GPU buffers rather than re-creating them. This is only used for bots and
+   remote players -- the player's own equipped weapon keeps the un-merged version, since its
+   magazine/bolt/pump need to move independently during reload animations. */
+function bakeMeshGeometry(mesh,parentMatrix){
+  mesh.updateMatrix();
+  const m=parentMatrix?new THREE.Matrix4().multiplyMatrices(parentMatrix,mesh.matrix):mesh.matrix;
+  return mesh.geometry.clone().applyMatrix4(m);
+}
+function mergeStaticModel(group){
+  const groups=new Map();
+  const outlineGeoms=[];
+  group.children.slice().forEach(mesh=>{
+    if(!mesh.isMesh) return;
+    const baked=bakeMeshGeometry(mesh);
+    const key=mesh.material.uuid+'|'+(!!mesh.castShadow)+'|'+(!!mesh.receiveShadow);
+    let bucket=groups.get(key);
+    if(!bucket){ bucket={mat:mesh.material,cast:!!mesh.castShadow,receive:!!mesh.receiveShadow,geoms:[]}; groups.set(key,bucket); }
+    bucket.geoms.push(baked);
+    mesh.children.slice().forEach(child=>{
+      if(child.isMesh&&child.material===outlineMat) outlineGeoms.push(bakeMeshGeometry(child,mesh.matrix));
+    });
+    mesh.geometry.dispose();
+  });
+  const result=new THREE.Group();
+  groups.forEach(bucket=>{
+    const merged=bucket.geoms.length>1?mergeBoxGeoms(bucket.geoms):bucket.geoms[0];
+    if(bucket.geoms.length>1) bucket.geoms.forEach(g=>g.dispose());
+    const m=new THREE.Mesh(merged,bucket.mat);
+    m.castShadow=bucket.cast; m.receiveShadow=bucket.receive;
+    result.add(m);
+  });
+  if(outlineGeoms.length){
+    const mergedOutline=outlineGeoms.length>1?mergeBoxGeoms(outlineGeoms):outlineGeoms[0];
+    if(outlineGeoms.length>1) outlineGeoms.forEach(g=>g.dispose());
+    const om=new THREE.Mesh(mergedOutline,outlineMat);
+    om.renderOrder=-1;
+    result.add(om);
+  }
+  return result;
+}
+const staticGunCache={};
+function getStaticGun(def){
+  if(!staticGunCache[def.id]) staticGunCache[def.id]=mergeStaticModel(buildGunModel(def).group);
+  return staticGunCache[def.id].clone();
+}
+
 const weapon=new THREE.Group();
 cam.add(weapon);
 const muzzleLight=new THREE.PointLight(0xffe9a8,0,4);
@@ -967,6 +1023,14 @@ function egg(cfg){
   }
   return g;
 }
+/* same merge+cache trick as getStaticGun, applied to bot/remote-player eggs -- keyed on
+   scale+gear+color since those are what actually change an egg's shape/material. */
+const staticEggCache={};
+function getStaticEgg(cfg){
+  const key=cfg.scale+'|'+cfg.gear+'|'+cfg.color;
+  if(!staticEggCache[key]) staticEggCache[key]=mergeStaticModel(egg(cfg));
+  return staticEggCache[key].clone();
+}
 
 /* ---------- audio (procedural, no assets) ---------- */
 let actx=null;
@@ -1016,6 +1080,24 @@ let playing=false, locked=false, dead=false, mouseDown=false, isZoomed=false, pa
 let sensitivity=.0022, shakeMag=0, recoilPitch=0, reserveAcc=0, reloadTimer=0, walkPhase=0;
 let lastFov=76;
 
+/* ---------- adaptive performance watchdog ----------
+   The weak-device guess at load time (CPU core count / memory / GPU string) can still miss a
+   laptop that's too slow in practice -- browsers increasingly hide the real GPU name for
+   privacy, and a normal-looking core count doesn't guarantee a decent GPU. This watches actual
+   frame time while a match is running and drops to low graphics on its own if it's not keeping
+   up, instead of relying only on the one-shot guess or making the player find the settings
+   toggle themselves. It only ever steps DOWN automatically (never back up), since flapping
+   between quality levels would itself cause stutter. */
+let perfAcc=0, perfFrames=0, perfWindowT=0;
+function perfWatch(dt){
+  if(lowGraphics) return;
+  perfAcc+=dt; perfFrames++; perfWindowT+=dt;
+  if(perfWindowT<2) return;
+  const avgFps=perfFrames/perfAcc;
+  perfAcc=0; perfFrames=0; perfWindowT=0;
+  if(avgFps<50){ lowGraphics=true; applyGraphics(); }
+}
+
 /* ---------- multiplayer state ---------- */
 let lobbyMode='solo';
 const mp={active:false,connected:false,connecting:false,ws:null,id:null,room:'',name:'',serverUrl:'wss://egg-assault-server.onrender.com',mapId:null,players:{},statusMsg:'',sendAcc:0};
@@ -1046,9 +1128,9 @@ function pickType(wave){
 function spawnBot(){
   const type=pickType(player.wave), cfg=BOT_TYPES[type];
   const angle=Math.random()*Math.PI*2, dist=22+Math.random()*26;
-  const g=egg(cfg);
+  const g=getStaticEgg(cfg);
   g.position.set(Math.cos(angle)*dist,0,Math.sin(angle)*dist);
-  const gp=buildGunModel(WEAPON_DEFS.ar); const w=gp.group;
+  const w=getStaticGun(WEAPON_DEFS.ar);
   w.scale.setScalar(cfg.scale*.75); w.position.set(.44*cfg.scale,.96*cfg.scale,.14*cfg.scale);
   g.add(w);
   const waveScale=1+player.wave*0.04;
@@ -1086,232 +1168,7 @@ function flash(id){
 }
 function showWaveBanner(text){
   const el=document.getElementById('wavebanner');
-  el.textContent=text; el.classList.add('show');
-  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1700);
-}
-function pushKillFeed(text){
-  const el=document.createElement('div');
-  el.className='kf-item';
-  el.textContent=text;
-  const feed=document.getElementById('killfeed');
-  feed.prepend(el);
-  requestAnimationFrame(()=>el.classList.add('show'));
-  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); },2000);
-  while(feed.children.length>4) feed.removeChild(feed.lastChild);
-}
-function addKillFeed(type){ pushKillFeed('CRACKED '+BOT_TYPES[type].label); }
-
-/* ---------- pause menu (opened by losing pointer lock, e.g. pressing ESC) ---------- */
-function pauseHTML(){
-  return `<div class='lobby-top'>
-      <div><div class='lobby-title'>PAUSED</div><div class='lobby-sub' style='color:#fff;text-shadow:0 1px 4px #0009'>Wave ${player.wave} &middot; ${player.kills} kills</div></div>
-      <div class='lobby-stat'>BEST&nbsp;WAVE&nbsp;${Math.max(player.wave,1)}</div>
-    </div>
-    <div class='lobby-spotlight'></div>
-    <div class='lobby-dock'>
-      <div class='btn-row'><button class='btn' id='resumeBtn' type='button'>RESUME</button></div>
-      <button class='btn-leave' id='leaveBtn' type='button'>LEAVE</button>
-      <div class='sensrow'>MOUSE SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
-      <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
-      <div class='hint'>Press <b>ESC</b> or tap RESUME to keep playing.</div>
-    </div>`;
-}
-function renderPauseMenu(){
-  const menu=document.getElementById('menu');
-  menu.innerHTML=pauseHTML();
-  menu.classList.add('show','dim');
-  document.getElementById('resumeBtn').onclick=closePauseMenu;
-  document.getElementById('leaveBtn').onclick=leaveToLobby;
-  document.getElementById('sens').addEventListener('input',e=>{ sensitivity=e.target.value/10000; });
-  document.getElementById('gfxBtn').onclick=()=>{ lowGraphics=!lowGraphics; applyGraphics(); renderPauseMenu(); };
-}
-function openPauseMenu(){
-  if(!playing||dead||paused) return;
-  paused=true;
-  mouseDown=false;
-  document.exitPointerLock?.();
-  document.querySelector('.hud').style.visibility='hidden';
-  renderPauseMenu();
-}
-function closePauseMenu(){
-  if(!paused) return;
-  paused=false;
-  document.getElementById('menu').classList.remove('show','dim');
-  document.querySelector('.hud').style.visibility='visible';
-  requestLock();
-}
-function leaveToLobby(){
-  paused=false;
-  playing=false; dead=false;
-  document.exitPointerLock?.();
-  if(mp.active) mpDisconnect();
-  lobbyMode='solo';
-  hideRespawnScreen();
-  renderMenu(false);
-}
-
-/* ---------- multiplayer networking ---------- */
-const REMOTE_COLORS=[0xf3e5c5,0x8fd1ff,0xff8a72,0xc9a2ff,0xffd35a,0x7de3a0];
-function colorForId(id){ let h=0; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0; return REMOTE_COLORS[h%REMOTE_COLORS.length]; }
-function mpStatus(msg){ mp.statusMsg=msg; const el=document.getElementById('mpStatus'); if(el) el.textContent=msg; }
-
-function mpConnect(url,room,name){
-  if(mp.connecting||mp.connected) return;
-  mp.connecting=true;
-  mpStatus('Connecting…');
-  let ws;
-  try{ ws=new WebSocket(url); }
-  catch(e){ mpStatus('That server URL looks invalid.'); mp.connecting=false; renderMenu(false); return; }
-  mp.ws=ws;
-  ws.onopen=()=>{ ws.send(JSON.stringify({t:'join',room,name,mapId:selectedMapId,weaponId:selectedWeaponId})); };
-  ws.onmessage=(ev)=>{ let msg; try{ msg=JSON.parse(ev.data); }catch(e){ return; } mpHandleMessage(msg); };
-  ws.onclose=()=>{
-    const wasConnected=mp.connected;
-    mp.connecting=false; mp.connected=false; mp.active=false; mp.ws=null;
-    Object.keys(mp.players).forEach(removeRemotePlayer);
-    const lb=document.getElementById('leaderboard'); if(lb) lb.style.display='none';
-    mpStatus(wasConnected?'Disconnected from server.':'Could not connect. Check the server URL.');
-    if(playing&&!dead){ playing=false; dead=false; paused=false; document.exitPointerLock?.(); hideRespawnScreen(); }
-    renderMenu(false);
-  };
-  ws.onerror=()=>{};
-}
-function mpDisconnect(){
-  if(mp.ws){ try{ mp.ws.close(); }catch(e){} }
-  mp.ws=null; mp.connected=false; mp.active=false; mp.connecting=false;
-  Object.keys(mp.players).forEach(removeRemotePlayer);
-  const lb=document.getElementById('leaderboard'); if(lb) lb.style.display='none';
-}
-function mpSend(obj){ if(mp.ws&&mp.ws.readyState===1) mp.ws.send(JSON.stringify(obj)); }
-function mpLeaveMatch(){
-  mpDisconnect();
-  playing=false; dead=false; paused=false;
-  document.exitPointerLock?.();
-  hideRespawnScreen();
-  renderMenu(false);
-}
-
-function makeNameSprite(name){
-  const cvs=document.createElement('canvas'); cvs.width=256; cvs.height=64;
-  const ctx=cvs.getContext('2d');
-  ctx.font="700 34px 'Chakra Petch', Arial, sans-serif";
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.lineWidth=6; ctx.strokeStyle='rgba(10,14,22,0.85)'; ctx.strokeText(name,128,34);
-  ctx.fillStyle='#fff'; ctx.fillText(name,128,34);
-  const tex=new THREE.CanvasTexture(cvs);
-  const mat=new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true});
-  const spr=new THREE.Sprite(mat);
-  spr.scale.set(1.4,.35,1);
-  spr.position.y=2.5;
-  spr.renderOrder=999;
-  return spr;
-}
-function spawnRemotePlayer(id,data){
-  if(mp.players[id]) return;
-  const cfg={hp:100,speed:1,scale:1,color:colorForId(id),dmg:[0,0],label:data.name,gear:null};
-  const g=egg(cfg);
-  const gp=buildGunModel(WEAPON_DEFS[data.weaponId]||WEAPON_DEFS.ar);
-  const w=gp.group;
-  w.scale.setScalar(.75); w.position.set(.44,.96,.14);
-  g.add(w);
-  const tag=makeNameSprite(data.name||'Player');
-  g.add(tag);
-  const pos=data.pos||[0,0,0];
-  g.position.set(pos[0],0,pos[2]);
-  g.userData.remotePlayerId=id;
-  const alive=data.alive!==false;
-  g.visible=alive;
-  scene.add(g);
-  mp.players[id]={
-    id,g,weaponModel:w,tag,name:data.name||'Player',weaponId:data.weaponId||'ar',
-    hp:data.hp!=null?data.hp:100,kills:data.kills||0,alive,
-    targetPos:new THREE.Vector3(pos[0],0,pos[2]),targetYaw:(data.yaw||0)+Math.PI,moving:false
-  };
-  g.rotation.y=mp.players[id].targetYaw;
-}
-function setRemoteWeapon(rp,weaponId){
-  rp.weaponId=weaponId;
-  if(rp.weaponModel) rp.g.remove(rp.weaponModel);
-  const gp=buildGunModel(WEAPON_DEFS[weaponId]||WEAPON_DEFS.ar);
-  const w=gp.group;
-  w.scale.setScalar(.75); w.position.set(.44,.96,.14);
-  rp.g.add(w);
-  rp.weaponModel=w;
-}
-function removeRemotePlayer(id){
-  const rp=mp.players[id];
-  if(!rp) return;
-  scene.remove(rp.g);
-  delete mp.players[id];
-}
-function updateLeaderboard(){
-  const el=document.getElementById('leaderboard');
-  if(!el) return;
-  if(!mp.active){ el.style.display='none'; return; }
-  el.style.display='flex';
-  const rows=[{name:mp.name||'You',kills:player.kills,me:true}];
-  Object.values(mp.players).forEach(rp=>rows.push({name:rp.name,kills:rp.kills,me:false}));
-  rows.sort((a,b)=>b.kills-a.kills);
-  el.innerHTML='<div class="lb-title">LEADERBOARD</div>'+rows.map(r=>
-    `<div class="lb-item${r.me?' me':''}"><span>${r.name}</span><span>${r.kills}</span></div>`
-  ).join('');
-}
-function showRespawnScreen(text,sub){
-  document.getElementById('respawnMsg').textContent=text;
-  document.getElementById('respawnSub').textContent=sub;
-  document.getElementById('respawnScreen').classList.add('show');
-}
-function hideRespawnScreen(){ document.getElementById('respawnScreen').classList.remove('show'); }
-function mpDeath(shooterId){
-  dead=true;
-  const killer=mp.players[shooterId];
-  showRespawnScreen('CRACKED',(killer?'by '+killer.name:'')+' — respawning…');
-  sfx.damage();
-}
-function mpHandleMessage(msg){
-  if(msg.t==='joined'){
-    mp.connecting=false; mp.connected=true; mp.id=msg.id; mp.mapId=msg.mapId;
-    selectedMapId=msg.mapId;
-    (msg.players||[]).forEach(p=>spawnRemotePlayer(p.id,p));
-    mpStatus('Connected! Entering arena…');
-    startGame(true);
-    return;
-  }
-  if(msg.t==='playerJoined'){
-    if(msg.id!==mp.id) spawnRemotePlayer(msg.id,msg);
-    updateLeaderboard();
-    return;
-  }
-  if(msg.t==='playerLeft'){
-    removeRemotePlayer(msg.id);
-    updateLeaderboard();
-    return;
-  }
-  if(msg.t==='state'){
-    const rp=mp.players[msg.id];
-    if(!rp) return;
-    rp.targetPos.set(msg.pos[0],0,msg.pos[2]);
-    rp.targetYaw=(msg.yaw||0)+Math.PI;
-    rp.moving=!!msg.moving;
-    if(msg.weaponId&&msg.weaponId!==rp.weaponId) setRemoteWeapon(rp,msg.weaponId);
-    return;
-  }
-  if(msg.t==='hit'){
-    if(msg.targetId===mp.id){
-      player.hp=msg.hp;
-      player.lastHit=performance.now();
-      updateHpUI(); flash('damage'); sfx.damage();
-      shakeMag=Math.min(1,shakeMag+.2);
-    } else if(mp.players[msg.targetId]){
-      mp.players[msg.targetId].hp=msg.hp;
-    }
-    return;
-  }
-  if(msg.t==='killed'){
-    if(msg.shooterId===mp.id){
-      player.kills=msg.kills;
-      document.getElementById('score').textContent=player.kills+' KILLS';
-    } else if(mp.players[msg.shooterId]){
+  el.textContent=t    } else if(mp.players[msg.shooterId]){
       mp.players[msg.shooterId].kills=msg.kills;
     }
     if(msg.targetId===mp.id){
@@ -1469,11 +1326,13 @@ function tracerGeoFor(def){
   return g;
 }
 const NEG_Z=new THREE.Vector3(0,0,-1);
-const MAX_PARTS=lowGraphics?90:220;
-const MAX_BULLETS=lowGraphics?32:64;
+/* functions, not consts -- lowGraphics can flip mid-match now (the perf watchdog below, or the
+   manual GFX toggle), so these caps need to track it live instead of freezing at load time */
+function maxParts(){ return lowGraphics?90:220; }
+function maxBullets(){ return lowGraphics?32:64; }
 
 function burst(p){
-  if(parts.length>MAX_PARTS) return;
+  if(parts.length>maxParts()) return;
   const n=lowGraphics?4:8;
   for(let i=0;i<n;i++){
     const m=new THREE.Mesh(sparkGeo,sparkMat);
@@ -1484,7 +1343,7 @@ function burst(p){
   }
 }
 function shellBurst(pos,colorHex){
-  if(parts.length>MAX_PARTS) return;
+  if(parts.length>maxParts()) return;
   const mat=shellMatFor(colorHex);
   const n=lowGraphics?5:10;
   for(let i=0;i<n;i++){
@@ -1499,7 +1358,7 @@ function shellBurst(pos,colorHex){
   }
 }
 function spawnBullet(from,to,def){
-  if(bullets.length>=MAX_BULLETS) return;
+  if(bullets.length>=maxBullets()) return;
   const dir=new THREE.Vector3().subVectors(to,from);
   const dist=Math.max(.001,dir.length());
   dir.normalize();
@@ -1824,6 +1683,7 @@ function update(dt){
     }
     return;
   }
+  perfWatch(dt);
   player.cd=Math.max(0,player.cd-dt);
   recoilPitch*=Math.pow(0.02,dt);
 
