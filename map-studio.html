@@ -797,24 +797,24 @@ function startApp(){
     if(!o){ HANDLE_KEYS.forEach(function(k){ handleMeshes[k].visible=false; }); return; }
     var def = EggMapShapes.shapeDef(o.type);
     var ax = localAxes(o.rot);
-    var halfW = o.w/2, halfD = o.d/2, pad = 0.5;
-    handleMeshes['u+'].position.set(o.x+ax.u.x*(halfW+pad), o.h*0.5, o.z+ax.u.z*(halfW+pad));
-    handleMeshes['u-'].position.set(o.x-ax.u.x*(halfW+pad), o.h*0.5, o.z-ax.u.z*(halfW+pad));
+    var halfW = o.w/2, halfD = o.d/2, pad = 0.5, baseY = o.y||0;
+    handleMeshes['u+'].position.set(o.x+ax.u.x*(halfW+pad), baseY+o.h*0.5, o.z+ax.u.z*(halfW+pad));
+    handleMeshes['u-'].position.set(o.x-ax.u.x*(halfW+pad), baseY+o.h*0.5, o.z-ax.u.z*(halfW+pad));
     handleMeshes['u+'].visible = true;
     handleMeshes['u-'].visible = true;
     if(def.radial){
       handleMeshes['v+'].visible = false;
       handleMeshes['v-'].visible = false;
     } else {
-      handleMeshes['v+'].position.set(o.x+ax.v.x*(halfD+pad), o.h*0.5, o.z+ax.v.z*(halfD+pad));
-      handleMeshes['v-'].position.set(o.x-ax.v.x*(halfD+pad), o.h*0.5, o.z-ax.v.z*(halfD+pad));
+      handleMeshes['v+'].position.set(o.x+ax.v.x*(halfD+pad), baseY+o.h*0.5, o.z+ax.v.z*(halfD+pad));
+      handleMeshes['v-'].position.set(o.x-ax.v.x*(halfD+pad), baseY+o.h*0.5, o.z-ax.v.z*(halfD+pad));
       handleMeshes['v+'].visible = true;
       handleMeshes['v-'].visible = true;
     }
     if(def.uniform){
       handleMeshes['h'].visible = false;
     } else {
-      handleMeshes['h'].position.set(o.x, o.h+pad, o.z);
+      handleMeshes['h'].position.set(o.x, baseY+o.h+pad, o.z);
       handleMeshes['h'].visible = true;
     }
   }
@@ -907,6 +907,7 @@ function startApp(){
         o[k] = parseFloat(inp.value);
         if(def.radial) o.d = o.w;
         if(def.uniform){ o.d = o.w; o.h = o.w; }
+        if(k==='w'||k==='d') o.y = restingY(o, o.id);
         panel.querySelector('[data-valfor="'+k+'"]').textContent = o[k];
         rebuildObjects(); selectObj(o.id); persist();
       });
@@ -946,10 +947,11 @@ function startApp(){
     panel.appendChild(delBtn);
 
     document.getElementById('rotBtn').addEventListener('click', function(){
-      o.rot = ((o.rot||0)+90)%360; rebuildObjects(); selectObj(o.id); persist();
+      o.rot = ((o.rot||0)+90)%360; o.y = restingY(o, o.id); rebuildObjects(); selectObj(o.id); persist();
     });
     document.getElementById('dupBtn').addEventListener('click', function(){
       var copy = Object.assign({}, o, {id:nextId++, x:o.x+2, z:o.z+2});
+      copy.y = restingY(copy, copy.id);
       state.objects.push(copy); rebuildObjects(); selectObj(copy.id); persist(); refreshCount();
     });
     delBtn.addEventListener('click', function(){
@@ -999,6 +1001,27 @@ function startApp(){
   function clampCoord(n){ return Math.max(-mapHalf, Math.min(mapHalf, n)); }
   function clampRange(n, r){ return Math.max(r[0], Math.min(r[1], n)); }
 
+  /* ---- stacking: pieces now have hitboxes with each other, so dropping one on top of
+     another rests it on that piece's roof instead of clipping down into/through it. For a
+     candidate footprint (x/z/w/d/rot) this looks at every other placed piece, and for any
+     whose footprint overlaps it in plan view, takes the tallest "roof" (that piece's own
+     resting height + its own h) among them. excludeId skips a piece being dragged/resized
+     so it never rests on itself. */
+  function restingY(cand, excludeId){
+    var cf = EggMapShapes.footprintWD(cand);
+    var cMinX=cand.x-cf.w/2, cMaxX=cand.x+cf.w/2, cMinZ=cand.z-cf.d/2, cMaxZ=cand.z+cf.d/2;
+    var top = 0;
+    state.objects.forEach(function(o){
+      if(o.id===excludeId) return;
+      var f = EggMapShapes.footprintWD(o);
+      var minX=o.x-f.w/2, maxX=o.x+f.w/2, minZ=o.z-f.d/2, maxZ=o.z+f.d/2;
+      if(cMinX>=maxX || cMaxX<=minX || cMinZ>=maxZ || cMaxZ<=minZ) return;
+      var oTop=(o.y||0)+o.h;
+      if(oTop>top) top=oTop;
+    });
+    return top;
+  }
+
   var mode = null; // 'orbit' | 'pan' | 'drag' | 'resize-u+' | 'resize-u-' | 'resize-v+' | 'resize-v-' | 'resize-h'
   var resizeStart = null;
   var last = {x:0,y:0};
@@ -1027,6 +1050,7 @@ function startApp(){
       var pt = groundHit(e);
       var def = toolDef(armed.type);
       var obj = {id:nextId++, type:def.type, w:def.w, d:def.d, h:def.h, x:clampCoord(snap(pt.x)), z:clampCoord(snap(pt.z)), rot:0, glow:false};
+      obj.y = restingY(obj);
       state.objects.push(obj);
       rebuildObjects(); selectObj(obj.id); persist(); refreshCount();
       mode = null;
@@ -1041,6 +1065,7 @@ function startApp(){
       prefab.objects.forEach(function(rel){
         var obj = {id:nextId++, type:rel.type, w:rel.w, d:rel.d, h:rel.h,
           x:clampCoord(baseX+rel.x), z:clampCoord(baseZ+rel.z), rot:rel.rot||0, glow: rel.glow||false};
+        obj.y = restingY(obj);
         state.objects.push(obj);
         newIds.push(obj.id);
       });
@@ -1082,6 +1107,7 @@ function startApp(){
       if(!o) return;
       var pt3 = groundHit(e);
       o.x = clampCoord(snap(pt3.x)); o.z = clampCoord(snap(pt3.z));
+      o.y = restingY(o, o.id);
       rebuildObjects(); selectObj(o.id);
     } else if(mode && mode.indexOf('resize-')===0){
       var so = resizeStart.o;
@@ -1109,6 +1135,7 @@ function startApp(){
         else { so.d = newLen; }
         so.x = clampCoord(newCx); so.z = clampCoord(newCz);
       }
+      so.y = restingY(so, so.id);
       rebuildObjects(); selectObj(so.id);
     }
   });
