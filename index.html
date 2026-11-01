@@ -1168,7 +1168,230 @@ function flash(id){
 }
 function showWaveBanner(text){
   const el=document.getElementById('wavebanner');
-  el.textContent=t    } else if(mp.players[msg.shooterId]){
+  el.textContent=text; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),1700);
+}
+function pushKillFeed(text){
+  const el=document.createElement('div');
+  el.className='kf-item';
+  el.textContent=text;
+  const feed=document.getElementById('killfeed');
+  feed.prepend(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); },2000);
+  while(feed.children.length>4) feed.removeChild(feed.lastChild);
+}
+function addKillFeed(type){ pushKillFeed('CRACKED '+BOT_TYPES[type].label); }
+
+/* ---------- pause menu (opened by losing pointer lock, e.g. pressing ESC) ---------- */
+function pauseHTML(){
+  return `<div class='lobby-top'>
+      <div><div class='lobby-title'>PAUSED</div><div class='lobby-sub' style='color:#fff;text-shadow:0 1px 4px #0009'>Wave ${player.wave} &middot; ${player.kills} kills</div></div>
+      <div class='lobby-stat'>BEST&nbsp;WAVE&nbsp;${Math.max(player.wave,1)}</div>
+    </div>
+    <div class='lobby-spotlight'></div>
+    <div class='lobby-dock'>
+      <div class='btn-row'><button class='btn' id='resumeBtn' type='button'>RESUME</button></div>
+      <button class='btn-leave' id='leaveBtn' type='button'>LEAVE</button>
+      <div class='sensrow'>MOUSE SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
+      <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
+      <div class='hint'>Press <b>ESC</b> or tap RESUME to keep playing.</div>
+    </div>`;
+}
+function renderPauseMenu(){
+  const menu=document.getElementById('menu');
+  menu.innerHTML=pauseHTML();
+  menu.classList.add('show','dim');
+  document.getElementById('resumeBtn').onclick=closePauseMenu;
+  document.getElementById('leaveBtn').onclick=leaveToLobby;
+  document.getElementById('sens').addEventListener('input',e=>{ sensitivity=e.target.value/10000; });
+  document.getElementById('gfxBtn').onclick=()=>{ lowGraphics=!lowGraphics; applyGraphics(); renderPauseMenu(); };
+}
+function openPauseMenu(){
+  if(!playing||dead||paused) return;
+  paused=true;
+  mouseDown=false;
+  document.exitPointerLock?.();
+  document.querySelector('.hud').style.visibility='hidden';
+  renderPauseMenu();
+}
+function closePauseMenu(){
+  if(!paused) return;
+  paused=false;
+  document.getElementById('menu').classList.remove('show','dim');
+  document.querySelector('.hud').style.visibility='visible';
+  requestLock();
+}
+function leaveToLobby(){
+  paused=false;
+  playing=false; dead=false;
+  document.exitPointerLock?.();
+  if(mp.active) mpDisconnect();
+  lobbyMode='solo';
+  hideRespawnScreen();
+  renderMenu(false);
+}
+
+/* ---------- multiplayer networking ---------- */
+const REMOTE_COLORS=[0xf3e5c5,0x8fd1ff,0xff8a72,0xc9a2ff,0xffd35a,0x7de3a0];
+function colorForId(id){ let h=0; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0; return REMOTE_COLORS[h%REMOTE_COLORS.length]; }
+function mpStatus(msg){ mp.statusMsg=msg; const el=document.getElementById('mpStatus'); if(el) el.textContent=msg; }
+
+function mpConnect(url,room,name){
+  if(mp.connecting||mp.connected) return;
+  mp.connecting=true;
+  mpStatus('Connecting…');
+  let ws;
+  try{ ws=new WebSocket(url); }
+  catch(e){ mpStatus('That server URL looks invalid.'); mp.connecting=false; renderMenu(false); return; }
+  mp.ws=ws;
+  ws.onopen=()=>{ ws.send(JSON.stringify({t:'join',room,name,mapId:selectedMapId,weaponId:selectedWeaponId})); };
+  ws.onmessage=(ev)=>{ let msg; try{ msg=JSON.parse(ev.data); }catch(e){ return; } mpHandleMessage(msg); };
+  ws.onclose=()=>{
+    const wasConnected=mp.connected;
+    mp.connecting=false; mp.connected=false; mp.active=false; mp.ws=null;
+    Object.keys(mp.players).forEach(removeRemotePlayer);
+    const lb=document.getElementById('leaderboard'); if(lb) lb.style.display='none';
+    mpStatus(wasConnected?'Disconnected from server.':'Could not connect. Check the server URL.');
+    if(playing&&!dead){ playing=false; dead=false; paused=false; document.exitPointerLock?.(); hideRespawnScreen(); }
+    renderMenu(false);
+  };
+  ws.onerror=()=>{};
+}
+function mpDisconnect(){
+  if(mp.ws){ try{ mp.ws.close(); }catch(e){} }
+  mp.ws=null; mp.connected=false; mp.active=false; mp.connecting=false;
+  Object.keys(mp.players).forEach(removeRemotePlayer);
+  const lb=document.getElementById('leaderboard'); if(lb) lb.style.display='none';
+}
+function mpSend(obj){ if(mp.ws&&mp.ws.readyState===1) mp.ws.send(JSON.stringify(obj)); }
+function mpLeaveMatch(){
+  mpDisconnect();
+  playing=false; dead=false; paused=false;
+  document.exitPointerLock?.();
+  hideRespawnScreen();
+  renderMenu(false);
+}
+
+function makeNameSprite(name){
+  const cvs=document.createElement('canvas'); cvs.width=256; cvs.height=64;
+  const ctx=cvs.getContext('2d');
+  ctx.font="700 34px 'Chakra Petch', Arial, sans-serif";
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.lineWidth=6; ctx.strokeStyle='rgba(10,14,22,0.85)'; ctx.strokeText(name,128,34);
+  ctx.fillStyle='#fff'; ctx.fillText(name,128,34);
+  const tex=new THREE.CanvasTexture(cvs);
+  const mat=new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true});
+  const spr=new THREE.Sprite(mat);
+  spr.scale.set(1.4,.35,1);
+  spr.position.y=2.5;
+  spr.renderOrder=999;
+  return spr;
+}
+function spawnRemotePlayer(id,data){
+  if(mp.players[id]) return;
+  const cfg={hp:100,speed:1,scale:1,color:colorForId(id),dmg:[0,0],label:data.name,gear:null};
+  const g=getStaticEgg(cfg);
+  const w=getStaticGun(WEAPON_DEFS[data.weaponId]||WEAPON_DEFS.ar);
+  w.scale.setScalar(.75); w.position.set(.44,.96,.14);
+  g.add(w);
+  const tag=makeNameSprite(data.name||'Player');
+  g.add(tag);
+  const pos=data.pos||[0,0,0];
+  g.position.set(pos[0],0,pos[2]);
+  g.userData.remotePlayerId=id;
+  const alive=data.alive!==false;
+  g.visible=alive;
+  scene.add(g);
+  mp.players[id]={
+    id,g,weaponModel:w,tag,name:data.name||'Player',weaponId:data.weaponId||'ar',
+    hp:data.hp!=null?data.hp:100,kills:data.kills||0,alive,
+    targetPos:new THREE.Vector3(pos[0],0,pos[2]),targetYaw:(data.yaw||0)+Math.PI,moving:false
+  };
+  g.rotation.y=mp.players[id].targetYaw;
+}
+function setRemoteWeapon(rp,weaponId){
+  rp.weaponId=weaponId;
+  if(rp.weaponModel) rp.g.remove(rp.weaponModel);
+  const w=getStaticGun(WEAPON_DEFS[weaponId]||WEAPON_DEFS.ar);
+  w.scale.setScalar(.75); w.position.set(.44,.96,.14);
+  rp.g.add(w);
+  rp.weaponModel=w;
+}
+function removeRemotePlayer(id){
+  const rp=mp.players[id];
+  if(!rp) return;
+  scene.remove(rp.g);
+  delete mp.players[id];
+}
+function updateLeaderboard(){
+  const el=document.getElementById('leaderboard');
+  if(!el) return;
+  if(!mp.active){ el.style.display='none'; return; }
+  el.style.display='flex';
+  const rows=[{name:mp.name||'You',kills:player.kills,me:true}];
+  Object.values(mp.players).forEach(rp=>rows.push({name:rp.name,kills:rp.kills,me:false}));
+  rows.sort((a,b)=>b.kills-a.kills);
+  el.innerHTML='<div class="lb-title">LEADERBOARD</div>'+rows.map(r=>
+    `<div class="lb-item${r.me?' me':''}"><span>${r.name}</span><span>${r.kills}</span></div>`
+  ).join('');
+}
+function showRespawnScreen(text,sub){
+  document.getElementById('respawnMsg').textContent=text;
+  document.getElementById('respawnSub').textContent=sub;
+  document.getElementById('respawnScreen').classList.add('show');
+}
+function hideRespawnScreen(){ document.getElementById('respawnScreen').classList.remove('show'); }
+function mpDeath(shooterId){
+  dead=true;
+  const killer=mp.players[shooterId];
+  showRespawnScreen('CRACKED',(killer?'by '+killer.name:'')+' — respawning…');
+  sfx.damage();
+}
+function mpHandleMessage(msg){
+  if(msg.t==='joined'){
+    mp.connecting=false; mp.connected=true; mp.id=msg.id; mp.mapId=msg.mapId;
+    selectedMapId=msg.mapId;
+    (msg.players||[]).forEach(p=>spawnRemotePlayer(p.id,p));
+    mpStatus('Connected! Entering arena…');
+    startGame(true);
+    return;
+  }
+  if(msg.t==='playerJoined'){
+    if(msg.id!==mp.id) spawnRemotePlayer(msg.id,msg);
+    updateLeaderboard();
+    return;
+  }
+  if(msg.t==='playerLeft'){
+    removeRemotePlayer(msg.id);
+    updateLeaderboard();
+    return;
+  }
+  if(msg.t==='state'){
+    const rp=mp.players[msg.id];
+    if(!rp) return;
+    rp.targetPos.set(msg.pos[0],0,msg.pos[2]);
+    rp.targetYaw=(msg.yaw||0)+Math.PI;
+    rp.moving=!!msg.moving;
+    if(msg.weaponId&&msg.weaponId!==rp.weaponId) setRemoteWeapon(rp,msg.weaponId);
+    return;
+  }
+  if(msg.t==='hit'){
+    if(msg.targetId===mp.id){
+      player.hp=msg.hp;
+      player.lastHit=performance.now();
+      updateHpUI(); flash('damage'); sfx.damage();
+      shakeMag=Math.min(1,shakeMag+.2);
+    } else if(mp.players[msg.targetId]){
+      mp.players[msg.targetId].hp=msg.hp;
+    }
+    return;
+  }
+  if(msg.t==='killed'){
+    if(msg.shooterId===mp.id){
+      player.kills=msg.kills;
+      document.getElementById('score').textContent=player.kills+' KILLS';
+    } else if(mp.players[msg.shooterId]){
       mp.players[msg.shooterId].kills=msg.kills;
     }
     if(msg.targetId===mp.id){
