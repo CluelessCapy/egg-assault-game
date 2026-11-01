@@ -79,7 +79,7 @@
     var rot = (((Math.round((o.rot || 0) / 90) % 4) + 4) % 4);
     var list = [];
     for (var i = 0; i < steps; i++) {
-      var top = stepH * (i + 1);
+      var top = (o.y || 0) + stepH * (i + 1);
       var rect;
       if (rot === 0) {
         var z0 = o.z - d / 2 + stepD * (i + 0.5);
@@ -117,7 +117,7 @@
       postA = { minX: o.x - fw.d / 2, maxX: o.x + fw.d / 2, minZ: o.z - halfSep - postW / 2, maxZ: o.z - halfSep + postW / 2 };
       postB = { minX: o.x - fw.d / 2, maxX: o.x + fw.d / 2, minZ: o.z + halfSep - postW / 2, maxZ: o.z + halfSep + postW / 2 };
     }
-    var lintel = { minX: o.x - fw.w / 2, maxX: o.x + fw.w / 2, minZ: o.z - fw.d / 2, maxZ: o.z + fw.d / 2, bottom: openH, top: o.h };
+    var lintel = { minX: o.x - fw.w / 2, maxX: o.x + fw.w / 2, minZ: o.z - fw.d / 2, maxZ: o.z + fw.d / 2, bottom: (o.y || 0) + openH, top: (o.y || 0) + o.h };
     return { postA: postA, postB: postB, lintel: lintel };
   }
 
@@ -220,20 +220,21 @@
   function buildShapeVisual(THREE, o, colorHex) {
     var colorNum = hexNum(colorHex);
     var w = o.w || 1, d = o.d || 1, h = o.h || 1;
+    var baseY = o.y || 0; // height this piece's base rests at -- 0 unless it's stacked on another piece
     var obj;
 
     if (o.type === "sphere") {
       var rs = w / 2;
       obj = new THREE.Mesh(new THREE.SphereGeometry(rs, 18, 14), detailMaterial(THREE, colorHex, o.type, 1, 1));
-      obj.position.set(o.x, rs, o.z);
+      obj.position.set(o.x, baseY + rs, o.z);
     } else if (o.type === "barrel") {
       var rb = w / 2;
       obj = new THREE.Mesh(new THREE.CylinderGeometry(rb, rb, h, 18), detailMaterial(THREE, colorHex, o.type, 1, Math.max(1, h / 1.4)));
-      obj.position.set(o.x, h / 2, o.z);
+      obj.position.set(o.x, baseY + h / 2, o.z);
     } else if (o.type === "cone") {
       var rc = w / 2;
       obj = new THREE.Mesh(new THREE.ConeGeometry(rc, h, 18), detailMaterial(THREE, colorHex, o.type, 1, 1));
-      obj.position.set(o.x, h / 2, o.z);
+      obj.position.set(o.x, baseY + h / 2, o.z);
     } else if (o.type === "stairs") {
       obj = new THREE.Group();
       var mat = detailMaterial(THREE, colorHex, o.type, w / 1.5, 1);
@@ -243,7 +244,7 @@
         sm.position.set(0, stepH * (i + 0.5), -d / 2 + stepD * (i + 0.5));
         obj.add(sm);
       }
-      obj.position.set(o.x, 0, o.z);
+      obj.position.set(o.x, baseY, o.z);
     } else if (o.type === "arch") {
       obj = new THREE.Group();
       var mat2 = detailMaterial(THREE, colorHex, o.type, w / 2, h / 2);
@@ -259,7 +260,7 @@
       var lt = new THREE.Mesh(new THREE.BoxGeometry(w, lintelH, d), mat2);
       lt.position.set(0, openH + lintelH / 2, 0);
       obj.add(lt);
-      obj.position.set(o.x, 0, o.z);
+      obj.position.set(o.x, baseY, o.z);
     } else if (o.type === "platform") {
       obj = new THREE.Group();
       var deckMat = detailMaterial(THREE, colorHex, o.type, w / 1.4, d / 1.4);
@@ -276,16 +277,16 @@
       var railB = new THREE.Mesh(new THREE.BoxGeometry(w, railH, 0.12), deckMat);
       railB.position.set(0, h + railH / 2 - 0.02, -d / 2 + 0.06);
       obj.add(railB);
-      obj.position.set(o.x, 0, o.z);
+      obj.position.set(o.x, baseY, o.z);
     } else if (o.type === "ramp") {
       var len = Math.sqrt(d * d + h * h);
       obj = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, len), detailMaterial(THREE, colorHex, o.type, w / 1.5, len / 1.5));
-      obj.position.set(o.x, h / 2, o.z);
+      obj.position.set(o.x, baseY + h / 2, o.z);
       obj.rotation.x = -Math.atan2(h, d);
     } else {
       // wall, halfwall, crate, pillar
       obj = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), detailMaterial(THREE, colorHex, o.type, w / 1.6, h / 1.6));
-      obj.position.set(o.x, h / 2, o.z);
+      obj.position.set(o.x, baseY + h / 2, o.z);
       if (o.type === "pillar") {
         var bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffd35a }));
         bulb.position.set(0, h / 2 + 0.2, 0);
