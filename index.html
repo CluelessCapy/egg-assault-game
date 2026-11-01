@@ -1461,7 +1461,7 @@ function menuHTML(isDeath){
         <div class='sensrow'>SENSITIVITY <input type='range' id='sens' min='8' max='45' value='${Math.round(sensitivity*10000)}'></div>
         <div class='sensrow'>GRAPHICS <button type='button' id='gfxBtn' class='pick' style='padding:6px 16px;width:auto'><div class="pick-name">${lowGraphics?'LOW (FASTER)':'HIGH'}</div></button></div>
       </div>
-      ${isDeath?'':`<div class='hint'><b>WASD</b> move &middot; <b>MOUSE</b> aim &middot; <b>CLICK</b> fire &middot; <b>R</b> reload &middot; <b>SHIFT</b> zoom &middot; right-click to scope (sniper)</div>`}
+      ${isDeath?'':`<div class='hint'><b>WASD</b> move &middot; <b>MOUSE</b> aim &middot; <b>CLICK</b> fire &middot; <b>R</b> reload &middot; <b>SHIFT</b> zoom &middot; <b>SPACE</b> jump &middot; right-click to scope (sniper)</div>`}
     </div>`;
 }
 function buildSelectRow(containerId,defs,selectedId,onPick){
