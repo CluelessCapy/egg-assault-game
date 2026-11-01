@@ -366,7 +366,7 @@ function groundHeightAt(x,z){
       const coord=p.axis==='z'?z:x;
       let t=(coord-p.lowCoord)/(p.highCoord-p.lowCoord);
       t=Math.max(0,Math.min(1,t));
-      top=p.h*t;
+      top=(p.y||0)+p.h*t;
     } else {
       top=p.top;
     }
@@ -476,8 +476,9 @@ function buildArena(mapId){
     geo.dispose();
   }
   function asolid(x,y,z,w,h,d,mat){ abox(x,y,z,w,h,d,mat); colliders.push({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}); }
-  function addDeck(x,z,w,d,topY,mat){
-    abox(x,topY/2,z,1.7,topY,1.7,mat);
+  function addDeck(x,z,w,d,baseY,topY,mat){
+    const postH=topY-baseY;
+    abox(x,baseY+postH/2,z,1.7,postH,1.7,mat);
     abox(x,topY-.14,z,w,.28,d,mat);
     platforms.push({minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2,kind:'flat',top:topY});
   }
@@ -492,10 +493,10 @@ function buildArena(mapId){
      above) plus the matching sloped "floor" so players can actually walk up it. rot is always
      a multiple of 90 in practice (the Map Studio only rotates pieces in 90-degree steps), which
      keeps the geometry below to four simple cardinal cases instead of arbitrary angles. */
-  function addRamp(x,z,w,d,h,rotDeg,mat){
+  function addRamp(x,z,w,d,baseY,h,rotDeg,mat){
     const len=Math.sqrt(d*d+h*h);
     const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,0.3,len),mat);
-    mesh.position.set(x,h/2,z);
+    mesh.position.set(x,baseY+h/2,z);
     mesh.rotation.x=-Math.atan2(h,d);
     mesh.rotation.y=(rotDeg||0)*Math.PI/180;
     mesh.castShadow=true; mesh.receiveShadow=true;
@@ -508,7 +509,7 @@ function buildArena(mapId){
     else if(steps===2){ rect={minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}; axis='z'; lowCoord=z+d/2; highCoord=z-d/2; }
     else if(steps===1){ rect={minX:x-d/2,maxX:x+d/2,minZ:z-w/2,maxZ:z+w/2}; axis='x'; lowCoord=x-d/2; highCoord=x+d/2; }
     else { rect={minX:x-d/2,maxX:x+d/2,minZ:z-w/2,maxZ:z+w/2}; axis='x'; lowCoord=x+d/2; highCoord=x-d/2; }
-    platforms.push(Object.assign({kind:'ramp',axis,lowCoord,highCoord,h},rect));
+    platforms.push(Object.assign({kind:'ramp',axis,lowCoord,highCoord,h,y:baseY},rect));
   }
   /* a wall/crate/pillar/platform piece rotated 90 or 270 degrees swaps its footprint's width
      and depth for our axis-aligned box pipeline -- close enough to true rotation for the
@@ -531,7 +532,7 @@ function buildArena(mapId){
   function addGlowLight(o){
     const reach=Math.max(o.w||2,o.d||2,o.h||2)*3.2+5;
     const l=new THREE.PointLight(EggMapShapes.hexNum(glowColorFor(o)),2.4,reach);
-    l.position.set(o.x,(o.h||2)*0.55,o.z);
+    l.position.set(o.x,(o.y||0)+(o.h||2)*0.55,o.z);
     arenaGroup.add(l);
   }
   function addCustomStairs(o,mat){
@@ -545,9 +546,9 @@ function buildArena(mapId){
   }
   function addCustomArch(o,mat){
     const parts=EggMapShapes.archParts(o);
-    asolid((parts.postA.minX+parts.postA.maxX)/2,o.h/2,(parts.postA.minZ+parts.postA.maxZ)/2,
+    asolid((parts.postA.minX+parts.postA.maxX)/2,(o.y||0)+o.h/2,(parts.postA.minZ+parts.postA.maxZ)/2,
       parts.postA.maxX-parts.postA.minX,o.h,parts.postA.maxZ-parts.postA.minZ,mat);
-    asolid((parts.postB.minX+parts.postB.maxX)/2,o.h/2,(parts.postB.minZ+parts.postB.maxZ)/2,
+    asolid((parts.postB.minX+parts.postB.maxX)/2,(o.y||0)+o.h/2,(parts.postB.minZ+parts.postB.maxZ)/2,
       parts.postB.maxX-parts.postB.minX,o.h,parts.postB.maxZ-parts.postB.minZ,mat);
     /* the lintel is drawn but deliberately left out of `colliders` -- this game's collision is
        flat/top-down (see resolveCollisions), so a floating overhead box there would wrongly
@@ -576,17 +577,17 @@ function buildArena(mapId){
     const wd=orientWD(o);
     if(o.type==='wall'||o.type==='halfwall'||o.type==='crate'||o.type==='pillar'){
       colliders.push({minX:o.x-wd.w/2,maxX:o.x+wd.w/2,minZ:o.z-wd.d/2,maxZ:o.z+wd.d/2});
-      if(o.type==='pillar'){ const l=new THREE.PointLight(0xffd35a,3.5,10); l.position.set(o.x,o.h+0.4,o.z); arenaGroup.add(l); }
+      if(o.type==='pillar'){ const l=new THREE.PointLight(0xffd35a,3.5,10); l.position.set(o.x,(o.y||0)+o.h+0.4,o.z); arenaGroup.add(l); }
     } else if(o.type==='platform'){
-      platforms.push({minX:o.x-wd.w/2,maxX:o.x+wd.w/2,minZ:o.z-wd.d/2,maxZ:o.z+wd.d/2,kind:'flat',top:o.h});
+      platforms.push({minX:o.x-wd.w/2,maxX:o.x+wd.w/2,minZ:o.z-wd.d/2,maxZ:o.z+wd.d/2,kind:'flat',top:(o.y||0)+o.h});
     } else if(o.type==='ramp'){
-      const steps=(Math.round((o.rot||0)/90)%4+4)%4, x=o.x,z=o.z,w=o.w,d=o.d,h=o.h;
+      const steps=(Math.round((o.rot||0)/90)%4+4)%4, x=o.x,z=o.z,w=o.w,d=o.d,h=o.h,baseY=o.y||0;
       let rect,axis,lowCoord,highCoord;
       if(steps===0){ rect={minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}; axis='z'; lowCoord=z-d/2; highCoord=z+d/2; }
       else if(steps===2){ rect={minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2}; axis='z'; lowCoord=z+d/2; highCoord=z-d/2; }
       else if(steps===1){ rect={minX:x-d/2,maxX:x+d/2,minZ:z-w/2,maxZ:z+w/2}; axis='x'; lowCoord=x-d/2; highCoord=x+d/2; }
       else { rect={minX:x-d/2,maxX:x+d/2,minZ:z-w/2,maxZ:z+w/2}; axis='x'; lowCoord=x+d/2; highCoord=x-d/2; }
-      platforms.push(Object.assign({kind:'ramp',axis,lowCoord,highCoord,h},rect));
+      platforms.push(Object.assign({kind:'ramp',axis,lowCoord,highCoord,h,y:baseY},rect));
     } else if(o.type==='stairs'){
       EggMapShapes.stairsSteps(o).forEach(r=>{
         platforms.push({minX:r.minX,maxX:r.maxX,minZ:r.minZ,maxZ:r.maxZ,kind:'flat',top:r.top});
@@ -604,18 +605,18 @@ function buildArena(mapId){
       if(o.color && o.type!=='barrel' && o.type!=='sphere' && o.type!=='cone'){
         addCustomColored(o);
       } else if(o.type==='wall'){
-        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
+        asolid(o.x,(o.y||0)+o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
       } else if(o.type==='halfwall'){
-        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
+        asolid(o.x,(o.y||0)+o.h/2,o.z,wd.w,o.h,wd.d,wallMat);
       } else if(o.type==='crate'){
-        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,crateMat);
+        asolid(o.x,(o.y||0)+o.h/2,o.z,wd.w,o.h,wd.d,crateMat);
       } else if(o.type==='pillar'){
-        asolid(o.x,o.h/2,o.z,wd.w,o.h,wd.d,pillarMat);
-        const l=new THREE.PointLight(0xffd35a,3.5,10); l.position.set(o.x,o.h+0.4,o.z); arenaGroup.add(l);
+        asolid(o.x,(o.y||0)+o.h/2,o.z,wd.w,o.h,wd.d,pillarMat);
+        const l=new THREE.PointLight(0xffd35a,3.5,10); l.position.set(o.x,(o.y||0)+o.h+0.4,o.z); arenaGroup.add(l);
       } else if(o.type==='platform'){
-        addDeck(o.x,o.z,wd.w,wd.d,o.h,pillarMat);
+        addDeck(o.x,o.z,wd.w,wd.d,o.y||0,(o.y||0)+o.h,pillarMat);
       } else if(o.type==='ramp'){
-        addRamp(o.x,o.z,o.w,o.d,o.h,o.rot||0,crateMat);
+        addRamp(o.x,o.z,o.w,o.d,o.y||0,o.h,o.rot||0,crateMat);
       } else if(o.type==='stairs'){
         addCustomStairs(o,crateMat);
       } else if(o.type==='arch'){
@@ -682,7 +683,7 @@ function buildArena(mapId){
     const steps=Math.round(pz.h/0.4);
     const stairX=pz.x-pz.dir.x*(pz.deckW/2+0.6), stairZ=pz.z-pz.dir.z*(pz.deckD/2+0.6);
     addStairs(stairX,stairZ,pz.dir.x,pz.dir.z,steps,2.4,0.62,pz.h/steps,crateMat);
-    addDeck(pz.x,pz.z,pz.deckW,pz.deckD,pz.h,pillarMat);
+    addDeck(pz.x,pz.z,pz.deckW,pz.deckD,0,pz.h,pillarMat);
     abox(pz.x,pz.h+1.6,pz.z-pz.deckD/2+0.3,pz.deckW*.7,1.4,0.4,crateMat);
     const l=new THREE.PointLight(0xffd35a,5,14); l.position.set(pz.x,pz.h+3.4,pz.z); arenaGroup.add(l);
   });
@@ -1273,21 +1274,6 @@ function mpLeaveMatch(){
   renderMenu(false);
 }
 
-function makeNameSprite(name){
-  const cvs=document.createElement('canvas'); cvs.width=256; cvs.height=64;
-  const ctx=cvs.getContext('2d');
-  ctx.font="700 34px 'Chakra Petch', Arial, sans-serif";
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.lineWidth=6; ctx.strokeStyle='rgba(10,14,22,0.85)'; ctx.strokeText(name,128,34);
-  ctx.fillStyle='#fff'; ctx.fillText(name,128,34);
-  const tex=new THREE.CanvasTexture(cvs);
-  const mat=new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true});
-  const spr=new THREE.Sprite(mat);
-  spr.scale.set(1.4,.35,1);
-  spr.position.y=2.5;
-  spr.renderOrder=999;
-  return spr;
-}
 function spawnRemotePlayer(id,data){
   if(mp.players[id]) return;
   const cfg={hp:100,speed:1,scale:1,color:colorForId(id),dmg:[0,0],label:data.name,gear:null};
@@ -1295,8 +1281,6 @@ function spawnRemotePlayer(id,data){
   const w=getStaticGun(WEAPON_DEFS[data.weaponId]||WEAPON_DEFS.ar);
   w.scale.setScalar(.75); w.position.set(.44,.96,.14);
   g.add(w);
-  const tag=makeNameSprite(data.name||'Player');
-  g.add(tag);
   const pos=data.pos||[0,0,0];
   g.position.set(pos[0],0,pos[2]);
   g.userData.remotePlayerId=id;
@@ -1304,7 +1288,7 @@ function spawnRemotePlayer(id,data){
   g.visible=alive;
   scene.add(g);
   mp.players[id]={
-    id,g,weaponModel:w,tag,name:data.name||'Player',weaponId:data.weaponId||'ar',
+    id,g,weaponModel:w,name:data.name||'Player',weaponId:data.weaponId||'ar',
     hp:data.hp!=null?data.hp:100,kills:data.kills||0,alive,
     targetPos:new THREE.Vector3(pos[0],0,pos[2]),targetYaw:(data.yaw||0)+Math.PI,moving:false
   };
@@ -1895,7 +1879,6 @@ function update(dt){
       let dyaw=rp.targetYaw-rp.g.rotation.y;
       dyaw=Math.atan2(Math.sin(dyaw),Math.cos(dyaw));
       rp.g.rotation.y+=dyaw*lerpT;
-      if(rp.tag) rp.tag.position.y=2.5;
     }
   }
   if(!playing||dead){
